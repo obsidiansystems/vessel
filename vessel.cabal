@@ -14,7 +14,7 @@ cabal-version:       >=1.10
 library
   exposed-modules:     Data.Vessel
   other-extensions:    FlexibleInstances, GeneralizedNewtypeDeriving, RankNTypes, ScopedTypeVariables, StandaloneDeriving, TypeFamilies, UndecidableInstances
-  build-depends:       base >=4.9 && <4.11
+  build-depends:       base >=4.9 && <4.12
                      , aeson
                      , bifunctors
                      , constraints
