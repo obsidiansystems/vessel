@@ -26,7 +26,7 @@ import Data.Semigroup
 import Data.Some hiding (This)
 import Data.These
 import Prelude hiding (lookup, map)
-import Reflex (Group(..), Additive, Query(..), FunctorMaybe(..))
+import Reflex (Group(..), Additive, Query(..), FunctorMaybe(..), ffilter)
 
 newtype Vessel f g a = Vessel { unVessel :: MonoidalDMap f (g a) }
   deriving (Eq, Ord, Read, Show)
@@ -53,19 +53,19 @@ instance (GCompare f, Has Semigroup f, Biapplicative g) => Align (Vessel f g) wh
       combine f x y
         | Dict <- argDict f :: Dict (Semigroup c) = bipure (\(This u) (That v) -> These u v) (<>) <<*>> x <<*>> y
 
-instance (GCompare f, Biapplicative g, Semigroup a, Has Semigroup f) => Semigroup (Vessel f g a) where
-  m <> n = salign m n
+instance (GCompare f, Biapplicative g, Bitraversable g, Monoid a, Eq a, Has Semigroup f) => Semigroup (Vessel f g a) where
+  m <> n = ffilter (/= mempty) (salign m n)
 
-instance (GCompare f, Biapplicative g, Semigroup a, Has Semigroup f) => Monoid (Vessel f g a) where
+instance (GCompare f, Biapplicative g, Bitraversable g, Monoid a, Eq a, Has Semigroup f) => Monoid (Vessel f g a) where
   mempty = Vessel empty
   mappend = (<>)
 
-instance (GCompare f, Biapplicative g, Has Semigroup f, Bifunctor g, Group a) => Group (Vessel f g a) where
+instance (GCompare f, Bitraversable g, Biapplicative g, Eq a, Has Semigroup f, Bifunctor g, Group a) => Group (Vessel f g a) where
   negateG = fmap negateG
 
-instance (GCompare f, Biapplicative g, Has Semigroup f, Bifunctor g, Group a, Additive a) => Additive (Vessel f g a)
+instance (GCompare f, Bitraversable g, Biapplicative g, Eq a, Has Semigroup f, Bifunctor g, Group a, Additive a) => Additive (Vessel f g a)
 
-instance (GCompare f, Has Semigroup f, Semigroup a) => Query (Vessel f Const a) where
+instance (GCompare f, Has Semigroup f, Monoid a, Eq a) => Query (Vessel f Const a) where
   type QueryResult (Vessel f Const a) = Vessel f (,) a
   crop (Vessel q) (Vessel v) = Vessel (intersectionWithKey (\_ _ x -> x) q v)
 
