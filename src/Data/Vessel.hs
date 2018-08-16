@@ -5,6 +5,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Data.Vessel where
 
@@ -27,6 +28,8 @@ import Data.Some hiding (This)
 import Data.These
 import Prelude hiding (lookup, map)
 import Reflex (Group(..), Additive, Query(..), FunctorMaybe(..), ffilter)
+
+import Data.TSum
 
 newtype Vessel f g a = Vessel { unVessel :: MonoidalDMap f (g a) }
   deriving (Eq, Ord, Read, Show)
@@ -94,3 +97,19 @@ buildV (Vessel q) f = fmap (Vessel . mapMaybeWithKey (\_ (Compose m) -> m)) $ tr
     body k (Const a) = do
       mr <- f k
       return (Compose (fmap ((,) a) mr))
+
+-- This elaborated version of buildV will check tokens on private components using the given function, and separates the handlers for public and private parts of
+-- the view selector.
+buildTSumV :: forall t t' pub priv m a. (Monad m, Ord t, GCompare pub, GCompare priv)
+  => Vessel (TSum t pub priv) Const a
+  -> (t -> m (Maybe t')) -- token checker
+  -> (forall x. pub x -> m (Maybe x))
+  -> (forall x. t' -> priv x -> m (Maybe x))
+  -> m (Vessel (TSum t pub priv) (,) a)
+buildTSumV vs checkToken publicHandler privateHandler = buildV vs $ \case
+  Public x -> publicHandler x
+  Private t x -> do
+    mt' <- checkToken t
+    case mt' of
+      Nothing -> return Nothing
+      Just t' -> privateHandler t' x
