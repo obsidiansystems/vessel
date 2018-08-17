@@ -18,11 +18,13 @@ library
   build-depends:       base >=4.9 && <4.12
                      , aeson
                      , bifunctors
+                     , containers
                      , constraints
                      , constraints-extras
                      , dependent-monoidal-map
                      , dependent-sum
                      , dependent-sum-aeson-orphans
+                     , monoidal-containers
                      , reflex
                      , these
   hs-source-dirs:      src

@@ -6,6 +6,15 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE UndecidableSuperClasses #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE InstanceSigs #-}
 
 module Data.Vessel where
 
@@ -17,7 +26,11 @@ import Data.Bitraversable
 import Data.Constraint
 import Data.Constraint.Extras
 import Data.Constraint.Forall
-import Data.Dependent.Map.Monoidal
+import qualified Data.Dependent.Map.Monoidal as DMap
+import Data.Dependent.Map.Monoidal (MonoidalDMap)
+import qualified Data.Map as Map
+import Data.Map (Map)
+import Data.Dependent.Sum
 import Data.Dependent.Sum.Orphans ()
 import Data.Functor.Compose
 import Data.Functor.Const
@@ -31,85 +44,65 @@ import Reflex (Group(..), Additive, Query(..), FunctorMaybe(..), ffilter)
 
 import Data.TSum
 
-newtype Vessel f g a = Vessel { unVessel :: MonoidalDMap f (g a) }
-  deriving (Eq, Ord, Read, Show)
+--import qualified Data.Map.Monoidal as Map
+--import Data.Map.Monoidal (MonoidalMap)
 
-deriving instance (ForallF ToJSON f, Has ToJSON f, ToJSON1 (g a)) => ToJSON (Vessel f g a)
-deriving instance (FromJSON (Some f), GCompare f, Has FromJSON f, FromJSON1 (g a)) => FromJSON (Vessel f g a)
+{-
+data TV a where
+  TV_Email :: TV (Mapf (Id Email') (First (Maybe EmailView)))
+-}
 
-instance (Bifunctor g) => Functor (Vessel f g) where
-  fmap f (Vessel m) = Vessel (map (first f) m)
+--newtype Mapf k v f = Mapf (MonoidalMap k (f v))
 
-instance (Bifoldable g) => Foldable (Vessel f g) where
-  foldr f i (Vessel m) = foldrWithKey (\_ v x -> bifoldr f (const id) x v) i m
+newtype FlipAp (a :: * -> *) (f :: (* -> *) -> *) = FlipAp { unFlipAp :: f a }
 
-instance (Bitraversable g) => Traversable (Vessel f g) where
-  traverse f (Vessel m) = fmap Vessel (traverseWithKey (\_ v -> bitraverse f pure v) m)
+newtype Vessel (f :: ((* -> *) -> *) -> *) (g :: * -> *) = Vessel { unVessel :: MonoidalDMap f (FlipAp g) }
 
-instance (GCompare f, Has Semigroup f, Biapplicative g) => Align (Vessel f g) where
-  nil = Vessel empty
-  align m n = Vessel (unionWithKey combine m' n')
-    where
-      Vessel m' = fmap This m
-      Vessel n' = fmap That n
-      combine :: forall a b c. f c -> g (These a b) c -> g (These a b) c -> g (These a b) c
-      combine f x y
-        | Dict <- argDict f :: Dict (Semigroup c) = bipure (\(This u) (That v) -> These u v) (<>) <<*>> x <<*>> y
+singletonVessel :: k v -> v g -> Vessel k g
+singletonVessel k v = Vessel (DMap.singleton k (FlipAp v))
 
-instance (GCompare f, Biapplicative g, Bitraversable g, Monoid a, Semigroup a, Eq a, Has Semigroup f) => Semigroup (Vessel f g a) where
-  m <> n = ffilter (/= mempty) (salign m n)
+--class c (t g) => ApClass (c :: k' -> Constraint) (g :: k) (t :: k -> k') where
 
-instance (GCompare f, Biapplicative g, Bitraversable g, Monoid a, Semigroup a, Eq a, Has Semigroup f) => Monoid (Vessel f g a) where
-  mempty = Vessel empty
-  mappend = (<>)
+instance (ForallF Semigroup f, Semigroup (g x)) => Semigroup (Compose f g x) where
 
-instance (GCompare f, Bitraversable g, Biapplicative g, Eq a, Has Semigroup f, Bifunctor g, Group a) => Group (Vessel f g a) where
-  negateG = fmap negateG
+instance (ForallF Monoid f, Semigroup (g x)) => Monoid (Compose f g x) where
 
-instance (GCompare f, Bitraversable g, Biapplicative g, Eq a, Has Semigroup f, Bifunctor g, Group a, Additive a) => Additive (Vessel f g a)
+instance Semigroup (Vessel f g) where
+  (<>) = undefined
 
-instance (GCompare f, Has Semigroup f, Monoid a, Semigroup a, Eq a) => Query (Vessel f Const a) where
-  type QueryResult (Vessel f Const a) = Vessel f (,) a
-  crop (Vessel q) (Vessel v) = Vessel (intersectionWithKey (\_ _ x -> x) q v)
+-- disperseQ f m = Map.unionsWith (<>) . map (\(k :=> v) -> fmap (DMap.singleton k) (f v)) . DMap.toList
 
-instance (GCompare f, Bitraversable g) => FunctorMaybe (Vessel f g) where
-  fmapMaybe f (Vessel v) = Vessel (mapMaybeWithKey (\_ x -> bitraverse f Just x) v)
+class View v where
+  disperseV :: (ForallF Monoid t, Functor t) => (forall x. f x -> t (g x)) -> v f -> t (v g)
+  condenseV :: (ForallF Monoid g, Ord t) => (forall x. Map t (g x) -> f x) -> Map t (v g) -> v f
+  hoistV :: (forall a. f a -> g a) -> v f -> v g
+  traverseV :: (Applicative m) => (forall a. f a -> m (g a)) -> v f -> m (v g)
 
-singletonVS :: (Num n) => k t -> Vessel k Const n
-singletonVS q = Vessel (singleton q (Const 1))
+has :: forall c f a r. (Has c f) => f a -> (c a => r) -> r
+has k r | (Dict :: Dict (c a)) <- argDict k = r
 
-singletonV :: k t -> t -> a -> Vessel k (,) a
-singletonV q v a = Vessel (singleton q (a, v))
+whichever :: forall c t a r. (ForallF c t) => (c (t a) => r) -> r
+whichever r = r \\ (instF :: ForallF c t :- c (t a))
 
-lookupV :: (GCompare k) => k t -> Vessel k (,) a -> Maybe t
-lookupV q (Vessel m) = fmap snd (lookup q m)
+instance (Has View k, GCompare k) => View (Vessel k) where
+  disperseV :: forall t f g. (ForallF Monoid t, Functor t) => (forall x. f x -> t (g x)) -> Vessel k f -> t (Vessel k g)
+  disperseV f (Vessel m) = whichever @Monoid @t @(Vessel k g) $ mconcat
+    . fmap (\(k :=> FlipAp v) -> has @View k $ fmap (singletonVessel k) $ disperseV f v)
+    . DMap.toList $ m
+  hoistV :: (forall a. f a -> g a) -> Vessel k f -> Vessel k g
+  hoistV f (Vessel m) = Vessel (DMap.mapWithKey (\k (FlipAp v) -> has @View k $ FlipAp (hoistV f v)) m)
+  traverseV :: (Applicative m) => (forall a. f a -> m (g a)) -> Vessel k f -> m (Vessel k g)
+  traverseV f (Vessel m) = fmap Vessel (DMap.traverseWithKey (\k (FlipAp v) -> has @View k $ fmap FlipAp (traverseV f v)) m)
+  condenseV :: forall g t f. (ForallF Monoid g, Ord t) => (forall x. Map t (g x) -> f x) -> Map t (Vessel k g) -> Vessel k f
+  condenseV f m = Vessel . DMap.mapWithKey (\k (Compose m) -> FlipAp . has @View k (condenseV f) $ fmap unFlipAp m)
+                . mconcat
+                . fmap (\(k, (Vessel v)) -> DMap.map (Compose . Map.singleton k) v) $ Map.toList m
 
-lookupV' :: (GCompare k) => k (First (Maybe t)) -> Vessel k (,) a -> Maybe t
-lookupV' q (Vessel m) = do
-  x <- fmap snd (lookup q m)
-  getFirst x
-
--- Given a view selector and a body which determines the response for each key, produces a view.
-buildV :: forall m k a. (Monad m, GCompare k) => Vessel k Const a -> (forall x. k x -> m (Maybe x)) -> m (Vessel k (,) a)
-buildV (Vessel q) f = fmap (Vessel . mapMaybeWithKey (\_ (Compose m) -> m)) $ traverseWithKey body q 
-  where
-    body :: k x -> Const a x -> m (Compose Maybe ((,) a) x)
-    body k (Const a) = do
-      mr <- f k
-      return (Compose (fmap ((,) a) mr))
-
--- This elaborated version of buildV will check tokens on private components using the given function, and separates the handlers for public and private parts of
--- the view selector.
-buildTSumV :: forall t t' pub priv m a. (Monad m, Ord t, GCompare pub, GCompare priv)
-  => Vessel (TSum t pub priv) Const a
-  -> (t -> m (Maybe t')) -- token checker
-  -> (forall x. pub x -> m (Maybe x))
-  -> (forall x. t' -> priv x -> m (Maybe x))
-  -> m (Vessel (TSum t pub priv) (,) a)
-buildTSumV vs checkToken publicHandler privateHandler = buildV vs $ \case
-  Public x -> publicHandler x
-  Private t x -> do
-    mt' <- checkToken t
-    case mt' of
-      Nothing -> return Nothing
-      Just t' -> privateHandler t' x
+-- TODO: Class for fromDistinctAscList? In disperseV and condenseV, we might be able to improve the cost relative to
+-- combining many singleton maps, if we know those maps are presented to us in sorted order.
+{-
+foldMapQ :: (Monoid m) => (forall a. f a -> m) -> v f -> m
+fmapMaybeQ :: (forall a. f a -> Maybe (g a)) -> v f -> v g
+alignWithQ :: (forall a. These (f a) (g a) -> h a) -> (v f, v g) -> v h
+unalignWithQ :: (forall a. f a -> These (g a) (h a)) -> v f -> (v g, v h)
+-}
