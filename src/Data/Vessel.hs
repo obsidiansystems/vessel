@@ -54,7 +54,7 @@ data TV a where
 
 --newtype Mapf k v f = Mapf (MonoidalMap k (f v))
 
-newtype FlipAp (a :: * -> *) (f :: (* -> *) -> *) = FlipAp { unFlipAp :: f a }
+newtype FlipAp (g :: * -> *) (v :: (* -> *) -> *) = FlipAp { unFlipAp :: v g }
 
 newtype Vessel (f :: ((* -> *) -> *) -> *) (g :: * -> *) = Vessel { unVessel :: MonoidalDMap f (FlipAp g) }
 
