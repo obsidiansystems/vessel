@@ -103,7 +103,7 @@ class View (v :: (* -> *) -> *) where
   -- They may actually help people write operations which are inefficient.
   -- | Given a structure specifying a query, and a structure representing a view of data,
   -- restrict the view to only those parts which satisfy the query. (Essentially intersection of Maps.)
-  cropV :: v s -> v i -> v i
+  cropV :: (forall a. s a -> i a -> r a) -> v s -> v i -> v r
   -- | We also want a way to determine if the container is empty, because shipping empty containers
   -- around is a bad idea.
   nullV :: v i -> Bool
@@ -154,11 +154,11 @@ deriving instance (GCompare k, Has' Eq k (FlipAp g)) => Eq (Vessel k g)
 
 instance (Has View k, GCompare k, Has' Semigroup k (FlipAp Identity)) => Query (Vessel k (Const x)) where
   type QueryResult (Vessel k (Const x)) = Vessel k Identity
-  crop = cropV
+  crop = cropV (\_ a -> a)
 
 instance (Has View k, GCompare k, Has' Semigroup k (FlipAp Identity)) => Query (Vessel k Proxy) where
   type QueryResult (Vessel k Proxy) = Vessel k Identity
-  crop = cropV
+  crop = cropV (\_ a -> a)
 
 -- TODO: figure out how to write a single instance for the case of Compose which depends on a Query instance for the right hand
 -- composed functor... and/or let's replace Query with something more appropriate since it's pretty uniform what we want the crop
@@ -173,7 +173,7 @@ instance ( Has View k
          , Query (Vessel k g) )
         => Query (Vessel k (Compose c g)) where
   type QueryResult (Vessel k (Compose c g)) = Vessel k (Compose c (VesselLeafWrapper (QueryResult (Vessel k g))))
-  crop = cropV
+  crop = cropV (\_ a -> a)
 
 -- A single Vessel key/value pair, essentially a choice of container type, together with a corresponding container.
 data VSum (k :: ((* -> *) -> *) -> *) (g :: * -> *) = forall v. k v :~> v g
@@ -211,7 +211,7 @@ newtype IdentityV (a :: *) (g :: * -> *) = IdentityV { unIdentityV :: g a }
   deriving (Eq, Ord, Show, Read, Semigroup, Monoid, Group, Additive, Generic)
 
 instance View (IdentityV a) where
-  cropV _ x = x
+  cropV f (IdentityV s) (IdentityV x) = IdentityV $ f s x
   nullV _ = False
   condenseV m = IdentityV (Compose (fmap unIdentityV m))
   disperseV (IdentityV (Compose m)) = fmap IdentityV m
@@ -244,7 +244,7 @@ instance (Group (g (First (Maybe a)))) => Group (SingleV a g) where
 instance (Additive (g (First (Maybe a)))) => Additive (SingleV a g)
 
 instance View (SingleV a) where
-  cropV _ x = x
+  cropV f (SingleV s) (SingleV i) = SingleV $ f s i
   nullV (SingleV _) = False
   condenseV :: (Foldable t, FunctorMaybe t, Functor t) => t (SingleV a g) -> SingleV a (Compose t g)
   condenseV m = SingleV . Compose $ fmap unSingleV m
@@ -264,7 +264,7 @@ newtype MapV k v g = MapV { unMapV :: MonoidalMap k (g v) }
   deriving (Eq, Ord, Show, Read, Semigroup, Monoid, Group, Additive, Generic)
 
 instance (Ord k) => View (MapV k v) where
-  cropV (MapV s) (MapV i) = MapV (Map.intersectionWithKey (\_ _ x -> x) s i)
+  cropV f (MapV s) (MapV i) = MapV (Map.intersectionWithKey (\_ x y -> f x y) s i)
   nullV (MapV m) = Map.null m
   condenseV m = MapV . fmap Compose . disperse . fmap unMapV $ m
   disperseV (MapV m) = fmap MapV . condense . fmap getCompose $ m
@@ -286,7 +286,7 @@ instance (Has' FromJSON k (Compose g v), FromJSON (Some k), GCompare k) => FromJ
 deriving instance (ForallF Show k, Has' Show k (Compose g v)) => Show (DMapV k v g)
 
 instance (GCompare k) => View (DMapV k v) where
-  cropV (DMapV s) (DMapV i) = DMapV (DMap.intersectionWithKey (\_ _ x -> x) s i)
+  cropV f (DMapV s) (DMapV i) = DMapV (DMap.intersectionWithKey (\_ (Compose x) (Compose y) -> Compose $ f x y) s i)
   nullV (DMapV m) = DMap.null m
   condenseV m = DMapV . DMap.map assocLCompose . condenseV . fmap unDMapV $ m
   disperseV (DMapV m) = fmap DMapV . disperseV . DMap.map assocRCompose $ m
@@ -452,8 +452,8 @@ unionDistinctAsc = Map.unionWith (\x _ -> x)
 ------- The View instance for MonoidalDMap -------
 
 instance (GCompare k) => View (MonoidalDMap k) where
-  cropV :: MonoidalDMap k s -> MonoidalDMap k i -> MonoidalDMap k i
-  cropV = DMap.intersectionWithKey (\_ _ v -> v)
+  cropV :: (forall a. s a -> i a -> r a) -> MonoidalDMap k s -> MonoidalDMap k i -> MonoidalDMap k r
+  cropV f = DMap.intersectionWithKey (\_ s i -> f s i)
 
   nullV :: MonoidalDMap k s -> Bool
   nullV m = DMap.null m
@@ -520,8 +520,8 @@ findPivotD m = case m of
 ------- The View instance for Vessel itself --------
 
 instance (Has View k, GCompare k) => View (Vessel k) where
-  cropV :: Vessel k s -> Vessel k i -> Vessel k i
-  cropV sv iv = intersectionWithKeyV (\k s i -> has @View k (cropV s i)) sv iv
+  cropV :: (forall a. s a -> i a -> r a) -> Vessel k s -> Vessel k i -> Vessel k r
+  cropV f sv iv = intersectionWithKeyV (\k s i -> has @View k (cropV f s i)) sv iv
   nullV :: Vessel k i -> Bool
   nullV (Vessel m) = DMap.null m
   mapV :: (forall a. f a -> g a) -> Vessel k f -> Vessel k g
