@@ -37,6 +37,9 @@ module Data.Vessel
   , mapMaybeWithKeyV
   , traverseWithKeyV
   , intersectionWithKeyV
+  , VSum (..)
+  , toListV
+  , fromListV
   , module Data.Proxy
   , module Data.Functor.Identity
   , module Data.Functor.Const
