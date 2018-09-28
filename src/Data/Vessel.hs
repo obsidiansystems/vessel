@@ -37,6 +37,7 @@ module Data.Vessel
   , mapMaybeWithKeyV
   , traverseWithKeyV
   , intersectionWithKeyV
+  , mapDecomposedV
   , VSum (..)
   , toListV
   , fromListV
@@ -574,6 +575,16 @@ splitLTV :: GCompare k => k v -> Vessel k g -> (Vessel k g, Vessel k g)
 splitLTV k (Vessel m) = case DMap.splitLookup k m of
   (l, Just v, r) -> (Vessel (DMap.insert k v l), Vessel r)
   (l, Nothing, r) -> (Vessel l, Vessel r)
+
+mapDecomposedV
+  :: (Functor m, View v)
+  => (v Proxy -> m (v Identity))
+  -> v (Compose (MonoidalMap c) g)
+  -> m (v (Compose (MonoidalMap c) Identity))
+mapDecomposedV f v = cropV recompose v <$> (f $ mapV (\_ -> Proxy) v)
+  where
+    recompose :: Compose (MonoidalMap c) g a -> Identity a -> Compose (MonoidalMap c) Identity a
+    recompose (Compose s) i = Compose $ i <$ s
 
 ------- Miscellaneous stuff to be moved elsewhere -------
 
