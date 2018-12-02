@@ -275,9 +275,13 @@ instance (Ord k) => View (MapV k v) where
   mapV f (MapV m) = MapV $ Map.map f m
   traverseV f (MapV m) = MapV <$> traverse f m
 
-instance (ToJSON k, ToJSON (g v), Ord k) => ToJSON (MapV k v g)
+instance (ToJSON k, ToJSON (g v), Ord k) => ToJSON (MapV k v g) where
+  toJSON = toJSON . Map.toList . unMapV
 
-instance (FromJSON k, FromJSON (g v), Ord k) => FromJSON (MapV k v g)
+instance (FromJSON k, FromJSON (g v), Ord k) => FromJSON (MapV k v g) where
+  parseJSON r = do
+    res <- parseJSON r
+    fmap MapV $ sequence $ Map.fromListWithKey (\_ _ -> fail "duplicate key in JSON deserialization of MapV") $ fmap (fmap return) res
 
 -- | A functor-indexed container corrresponding to DMap k v.
 newtype DMapV (k :: * -> *) (v :: * -> *) g = DMapV { unDMapV :: MonoidalDMap k (Compose g v) }

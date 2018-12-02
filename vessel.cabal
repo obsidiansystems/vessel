@@ -24,7 +24,7 @@ library
                      , dependent-monoidal-map
                      , dependent-sum
                      , dependent-sum-aeson-orphans
-                     , monoidal-containers >= 0.5.0.0
+                     , monoidal-containers
                      , reflex
                      , these
                      , QuickCheck
