@@ -116,6 +116,9 @@ class View (v :: (* -> *) -> *) where
   mapV :: (forall a. f a -> g a) -> v f -> v g
   -- | Traverse over the leaves of a container.
   traverseV :: (Applicative m) => (forall a. f a -> m (g a)) -> v f -> m (v g)
+  -- | Map over all the leaves of a container, keeping only the 'Just' results
+  -- and returing 'Nothing' if no leaves are kept.
+  mapMaybeV :: (forall a. f a -> Maybe (g a)) -> v f -> Maybe (v g)
 
 -- | A main point of the View class is to be able to produce this QueryMorphism.
 transposeView
@@ -221,6 +224,7 @@ instance View (IdentityV a) where
   disperseV (IdentityV (Compose m)) = fmap IdentityV m
   mapV f (IdentityV x) = IdentityV (f x)
   traverseV f (IdentityV x) = IdentityV <$> f x
+  mapMaybeV f (IdentityV x) = IdentityV <$> f x
 
 instance ToJSON (g a) => ToJSON (IdentityV a g)
 
@@ -258,6 +262,7 @@ instance View (SingleV a) where
   mapV f (SingleV x) = SingleV $ f x
   traverseV :: (Applicative m) => (forall x. f x -> m (g x)) -> SingleV a f -> m (SingleV a g)
   traverseV f (SingleV x) = SingleV <$> f x
+  mapMaybeV f (SingleV x) = SingleV <$> f x
 
 instance ToJSON (g (First (Maybe a))) => ToJSON (SingleV a g)
 
@@ -274,6 +279,7 @@ instance (Ord k) => View (MapV k v) where
   disperseV (MapV m) = fmap MapV . condense . fmap getCompose $ m
   mapV f (MapV m) = MapV $ Map.map f m
   traverseV f (MapV m) = MapV <$> traverse f m
+  mapMaybeV f (MapV m) = collapseNullV $ MapV $ Map.mapMaybe f m
 
 instance (ToJSON k, ToJSON (g v), Ord k) => ToJSON (MapV k v g) where
   toJSON = toJSON . Map.toList . unMapV
@@ -300,6 +306,8 @@ instance (GCompare k) => View (DMapV k v) where
   disperseV (DMapV m) = fmap DMapV . disperseV . DMap.map assocRCompose $ m
   mapV f (DMapV m) = DMapV $ DMap.map (\(Compose x) -> Compose (f x)) m
   traverseV f (DMapV m) = DMapV <$> DMap.traverseWithKey (\_ (Compose x) -> Compose <$> f x) m
+  mapMaybeV f (DMapV (MonoidalDMap m)) = collapseNullV $ DMapV $ MonoidalDMap $
+    DMap'.mapMaybe (fmap Compose . f . getCompose) m
 
 ------- Selectable convenience class -------
 
@@ -486,6 +494,9 @@ instance (GCompare k) => View (MonoidalDMap k) where
   traverseV :: (Applicative m) => (forall a. f a -> m (g a)) -> MonoidalDMap k f -> m (MonoidalDMap k g)
   traverseV f m = DMap.traverseWithKey (\_ v -> f v) m
 
+  mapMaybeV f (MonoidalDMap m) = collapseNullV $ MonoidalDMap $
+    DMap'.mapMaybe f m
+
 condenseD' :: (GCompare k, Foldable t, FunctorMaybe t)
            => DMap k g
            -> t (MonoidalDMap k g)
@@ -547,6 +558,8 @@ instance (Has View k, GCompare k) => View (Vessel k) where
     OneD k (FlipAp v) -> fmap (singletonV k) (has @View k (disperseV v))
     SplitD pivot _l _r -> uncurry (alignWith (mergeThese unionDistinctAscV)) $
       disperseV *** disperseV $ splitLTV pivot row
+  mapMaybeV f (Vessel (MonoidalDMap m)) = collapseNullV $ Vessel $ MonoidalDMap $
+    DMap'.mapMaybeWithKey (\k (FlipAp v) -> has @View k $ FlipAp <$> mapMaybeV f v) m
 
 condenseV' :: forall k t g.
               ( Has View k, GCompare k, Foldable t, FunctorMaybe t, Functor t)
@@ -589,6 +602,11 @@ mapDecomposedV f v = cropV recompose v <$> (f $ mapV (\_ -> Proxy) v)
   where
     recompose :: Compose (MonoidalMap c) g a -> Identity a -> Compose (MonoidalMap c) Identity a
     recompose (Compose s) i = Compose $ i <$ s
+
+collapseNullV :: View v => v f -> Maybe (v f)
+collapseNullV v = if nullV v
+  then Nothing
+  else Just v
 
 ------- Miscellaneous stuff to be moved elsewhere -------
 
