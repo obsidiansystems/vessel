@@ -108,6 +108,9 @@ class View (v :: (* -> *) -> *) where
   -- | Given a structure specifying a query, and a structure representing a view of data,
   -- restrict the view to only those parts which satisfy the query. (Essentially intersection of Maps.)
   cropV :: (forall a. s a -> i a -> r a) -> v s -> v i -> v r
+  -- | Given a structure specifying a new query, and a structure representing an old query,
+  -- restrict the new query to only those parts which are new. (Essentially difference of Maps.)
+  subtractV :: (forall a. s a -> s a -> Maybe (s a)) -> v s -> v s -> Maybe (v s)
   -- | We also want a way to determine if the container is empty, because shipping empty containers
   -- around is a bad idea.
   nullV :: v i -> Bool
@@ -219,6 +222,7 @@ newtype IdentityV (a :: *) (g :: * -> *) = IdentityV { unIdentityV :: g a }
 
 instance View (IdentityV a) where
   cropV f (IdentityV s) (IdentityV x) = IdentityV $ f s x
+  subtractV f (IdentityV s) (IdentityV x) = IdentityV <$> f s x
   nullV _ = False
   condenseV m = IdentityV (Compose (fmap unIdentityV m))
   disperseV (IdentityV (Compose m)) = fmap IdentityV m
@@ -253,6 +257,7 @@ instance (Additive (g (First (Maybe a)))) => Additive (SingleV a g)
 
 instance View (SingleV a) where
   cropV f (SingleV s) (SingleV i) = SingleV $ f s i
+  subtractV f (SingleV s) (SingleV i) = SingleV <$> f s i
   nullV (SingleV _) = False
   condenseV :: (Foldable t, FunctorMaybe t, Functor t) => t (SingleV a g) -> SingleV a (Compose t g)
   condenseV m = SingleV . Compose $ fmap unSingleV m
@@ -274,6 +279,7 @@ newtype MapV k v g = MapV { unMapV :: MonoidalMap k (g v) }
 
 instance (Ord k) => View (MapV k v) where
   cropV f (MapV s) (MapV i) = MapV (Map.intersectionWithKey (\_ x y -> f x y) s i)
+  subtractV f (MapV s) (MapV i) = collapseNullV $ MapV (Map.differenceWithKey (\_ x y -> f x y) s i)
   nullV (MapV m) = Map.null m
   condenseV m = MapV . fmap Compose . disperse . fmap unMapV $ m
   disperseV (MapV m) = fmap MapV . condense . fmap getCompose $ m
@@ -301,6 +307,7 @@ deriving instance (ForallF Show k, Has' Show k (Compose g v)) => Show (DMapV k v
 
 instance (GCompare k) => View (DMapV k v) where
   cropV f (DMapV s) (DMapV i) = DMapV (DMap.intersectionWithKey (\_ (Compose x) (Compose y) -> Compose $ f x y) s i)
+  subtractV f (DMapV s) (DMapV i) = collapseNullV $ DMapV (DMap.differenceWithKey (\_ (Compose x) (Compose y) -> Compose <$> f x y) s i)
   nullV (DMapV m) = DMap.null m
   condenseV m = DMapV . DMap.map assocLCompose . condenseV . fmap unDMapV $ m
   disperseV (DMapV m) = fmap DMapV . disperseV . DMap.map assocRCompose $ m
@@ -370,6 +377,10 @@ buildV v f = traverseWithKeyV f v
 intersectionWithKeyV :: (GCompare k) => (forall v. k v -> v g -> v g' -> v h) -> Vessel k g -> Vessel k g' -> Vessel k h
 intersectionWithKeyV f (Vessel m) (Vessel m') = Vessel $
   DMap.intersectionWithKey (\k (FlipAp x) (FlipAp y) -> FlipAp (f k x y)) m m'
+
+differenceWithKeyV :: (GCompare k) => (forall v. k v -> v g -> v g -> Maybe (v g)) -> Vessel k g -> Vessel k g -> Vessel k g
+differenceWithKeyV f (Vessel m) (Vessel m') = Vessel $
+  DMap.differenceWithKey (\k (FlipAp x) (FlipAp y) -> FlipAp <$> f k x y) m m'
 
 ------- Instances for FlipAp -------
 
@@ -471,6 +482,9 @@ instance (GCompare k) => View (MonoidalDMap k) where
   cropV :: (forall a. s a -> i a -> r a) -> MonoidalDMap k s -> MonoidalDMap k i -> MonoidalDMap k r
   cropV f = DMap.intersectionWithKey (\_ s i -> f s i)
 
+  subtractV :: (forall a. s a -> s a -> Maybe (s a)) -> MonoidalDMap k s -> MonoidalDMap k s -> Maybe (MonoidalDMap k s)
+  subtractV f new old = collapseNullV $ DMap.differenceWithKey (\_ s i -> f s i) new old
+
   nullV :: MonoidalDMap k s -> Bool
   nullV m = DMap.null m
 
@@ -541,6 +555,8 @@ findPivotD m = case m of
 instance (Has View k, GCompare k) => View (Vessel k) where
   cropV :: (forall a. s a -> i a -> r a) -> Vessel k s -> Vessel k i -> Vessel k r
   cropV f sv iv = intersectionWithKeyV (\k s i -> has @View k (cropV f s i)) sv iv
+  subtractV :: (forall a. s a -> s a -> Maybe (s a)) -> Vessel k s -> Vessel k s -> Maybe (Vessel k s)
+  subtractV f sv iv = collapseNullV $ differenceWithKeyV (\k s i -> has @View k (subtractV f s i)) sv iv
   nullV :: Vessel k i -> Bool
   nullV (Vessel m) = DMap.null m
   mapV :: (forall a. f a -> g a) -> Vessel k f -> Vessel k g
