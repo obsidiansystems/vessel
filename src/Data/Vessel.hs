@@ -38,6 +38,7 @@ module Data.Vessel
   , traverseWithKeyV
   , intersectionWithKeyV
   , mapDecomposedV
+  , collapseNullV
   , VSum (..)
   , toListV
   , fromListV
@@ -64,7 +65,9 @@ import Data.Functor.Compose
 import Data.Functor.Const
 import Data.Functor.Identity
 import Data.GADT.Compare
-import Data.Map.Monoidal (MonoidalMap)
+import Data.GADT.Show
+import qualified Data.Map as Map'
+import Data.Map.Monoidal (MonoidalMap (..))
 import qualified Data.Map.Monoidal as Map
 import Data.Maybe
 import Data.Proxy
@@ -77,6 +80,7 @@ import Data.These
 import GHC.Generics (Generic)
 import Prelude hiding (lookup, map, null)
 import Reflex (Group(..), Additive, Query(..), QueryMorphism(..), FunctorMaybe(..))
+import Data.AppendMap () -- For Group and Additive instances for MonoidalMap
 
 ------- The View Class -------
 
@@ -119,6 +123,10 @@ class View (v :: (* -> *) -> *) where
   -- | Map over all the leaves of a container, keeping only the 'Just' results
   -- and returing 'Nothing' if no leaves are kept.
   mapMaybeV :: (forall a. f a -> Maybe (g a)) -> v f -> Maybe (v g)
+  -- | Map over all the leaves of two containers, combining the leaves with the
+  -- provided function, keeping only the 'Just' results and returing 'Nothing'
+  -- if no leaves are kept.
+  alignWithMaybeV :: (forall a. These (f a) (g a) -> Maybe (h a)) -> v f -> v g -> Maybe (v h)
 
 -- | A main point of the View class is to be able to produce this QueryMorphism.
 transposeView
@@ -157,15 +165,17 @@ newtype FlipAp (g :: k) (v :: k -> *) = FlipAp { unFlipAp :: v g }
 
 deriving instance (GCompare k, Has' Eq k (FlipAp g)) => Eq (Vessel k g)
 
+deriving instance (ForallF Show k, GShow k, Has' Show k (FlipAp g)) => Show (Vessel k g)
+
 -- TODO: Ord, Read, Show
 
 instance (Has View k, GCompare k, Has' Semigroup k (FlipAp Identity)) => Query (Vessel k (Const x)) where
   type QueryResult (Vessel k (Const x)) = Vessel k Identity
-  crop = cropV (\_ a -> a)
+  crop = cropV (\_ a -> a) --TODO
 
 instance (Has View k, GCompare k, Has' Semigroup k (FlipAp Identity)) => Query (Vessel k Proxy) where
   type QueryResult (Vessel k Proxy) = Vessel k Identity
-  crop = cropV (\_ a -> a)
+  crop = cropV (\_ a -> a) --TODO
 
 -- TODO: figure out how to write a single instance for the case of Compose which depends on a Query instance for the right hand
 -- composed functor... and/or let's replace Query with something more appropriate since it's pretty uniform what we want the crop
@@ -225,6 +235,7 @@ instance View (IdentityV a) where
   mapV f (IdentityV x) = IdentityV (f x)
   traverseV f (IdentityV x) = IdentityV <$> f x
   mapMaybeV f (IdentityV x) = IdentityV <$> f x
+  alignWithMaybeV f (IdentityV x) (IdentityV y) = IdentityV <$> f (These x y)
 
 instance ToJSON (g a) => ToJSON (IdentityV a g)
 
@@ -263,6 +274,7 @@ instance View (SingleV a) where
   traverseV :: (Applicative m) => (forall x. f x -> m (g x)) -> SingleV a f -> m (SingleV a g)
   traverseV f (SingleV x) = SingleV <$> f x
   mapMaybeV f (SingleV x) = SingleV <$> f x
+  alignWithMaybeV f (SingleV x) (SingleV y) = SingleV <$> f (These x y)
 
 instance ToJSON (g (First (Maybe a))) => ToJSON (SingleV a g)
 
@@ -280,6 +292,7 @@ instance (Ord k) => View (MapV k v) where
   mapV f (MapV m) = MapV $ Map.map f m
   traverseV f (MapV m) = MapV <$> traverse f m
   mapMaybeV f (MapV m) = collapseNullV $ MapV $ Map.mapMaybe f m
+  alignWithMaybeV f (MapV (MonoidalMap a)) (MapV (MonoidalMap b)) = collapseNullV $ MapV $ MonoidalMap $ Map'.mapMaybe id $ alignWith f a b
 
 instance (ToJSON k, ToJSON (g v), Ord k) => ToJSON (MapV k v g) where
   toJSON = toJSON . Map.toList . unMapV
@@ -308,6 +321,7 @@ instance (GCompare k) => View (DMapV k v) where
   traverseV f (DMapV m) = DMapV <$> DMap.traverseWithKey (\_ (Compose x) -> Compose <$> f x) m
   mapMaybeV f (DMapV (MonoidalDMap m)) = collapseNullV $ DMapV $ MonoidalDMap $
     DMap'.mapMaybe (fmap Compose . f . getCompose) m
+--  alignWithMaybeV f (DMapV (MonoidalDMap a)) (DMapV (MonoidalDMap b)) = collapseNullV $ DMapV $ MonoidalDMap $ DMap'.mapMaybe _ $ DMap.alignWith f a b
 
 ------- Selectable convenience class -------
 
@@ -560,6 +574,27 @@ instance (Has View k, GCompare k) => View (Vessel k) where
       disperseV *** disperseV $ splitLTV pivot row
   mapMaybeV f (Vessel (MonoidalDMap m)) = collapseNullV $ Vessel $ MonoidalDMap $
     DMap'.mapMaybeWithKey (\k (FlipAp v) -> has @View k $ FlipAp <$> mapMaybeV f v) m
+  alignWithMaybeV (f :: forall a. These (f a) (g a) -> Maybe (h a)) (Vessel a) (Vessel b) = collapseNullV $ Vessel $
+    let g :: forall v. k v -> These (FlipAp f v) (FlipAp g v) -> Maybe (FlipAp h v)
+        g k = has @View k $ fmap FlipAp . \case
+          This (FlipAp a) -> mapMaybeV (f . This) a
+          That (FlipAp b) -> mapMaybeV (f . That) b
+          These (FlipAp a) (FlipAp b) -> alignWithMaybeV f a b
+    in alignWithKeyMaybeMonoidalDMap g a b
+
+alignWithKeyMaybeMonoidalDMap :: GCompare k => (forall a. k a -> These (f a) (g a) -> Maybe (h a)) -> MonoidalDMap k f -> MonoidalDMap k g -> MonoidalDMap k h
+alignWithKeyMaybeMonoidalDMap f (MonoidalDMap a) (MonoidalDMap b) = MonoidalDMap $ alignWithKeyMaybeDMap f a b
+
+data DThese f g a = DThis (f a) | DThat (g a) | DThese (f a) (g a)
+
+dtheseToThese :: DThese f g a -> These (f a) (g a)
+dtheseToThese = \case
+  DThis a -> This a
+  DThat b -> That b
+  DThese a b -> These a b
+
+alignWithKeyMaybeDMap :: GCompare k => (forall a. k a -> These (f a) (g a) -> Maybe (h a)) -> DMap k f -> DMap k g -> DMap k h
+alignWithKeyMaybeDMap f a b = DMap'.mapMaybeWithKey (\k t -> f k $ dtheseToThese t) $ DMap'.unionWithKey (\_ (DThis x) (DThat y) -> DThese x y) (DMap'.map DThis a) (DMap'.map DThat b)
 
 condenseV' :: forall k t g.
               ( Has View k, GCompare k, Foldable t, FunctorMaybe t, Functor t)
