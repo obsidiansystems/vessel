@@ -631,11 +631,6 @@ instance Group g => Group (Const g x) where
 
 instance Additive g => Additive (Const g x)
 
-instance (Ord k, Group v) => Group (MonoidalMap k v) where
-  negateG m = Map.map negateG m
-
-instance (Ord k, Additive v) => Additive (MonoidalMap k v)
-
 instance (Semigroup (f (g a))) => Semigroup (Compose f g a) where
   (Compose x) <> (Compose y) = Compose (x <> y)
 
