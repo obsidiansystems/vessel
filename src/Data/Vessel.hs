@@ -38,6 +38,7 @@ module Data.Vessel
   , traverseWithKeyV
   , intersectionWithKeyV
   , mapDecomposedV
+  , alignWithMV
   , collapseNullV
   , VSum (..)
   , toListV
@@ -127,6 +128,17 @@ class View (v :: (* -> *) -> *) where
   -- provided function, keeping only the 'Just' results and returing 'Nothing'
   -- if no leaves are kept.
   alignWithMaybeV :: (forall a. These (f a) (g a) -> Maybe (h a)) -> v f -> v g -> Maybe (v h)
+
+alignWithMV
+  :: forall m v f g h
+  .  (View v, Applicative m)
+  => (forall a. These (f a) (g a) -> m (h a))
+  -> v f
+  -> v g
+  -> m (Maybe (v h))
+alignWithMV f a b = traverse (traverseV getCompose) $ alignWithMaybeV g a b
+  where g :: forall a. These (f a) (g a) -> Maybe (Compose m h a)
+        g = Just . Compose . f
 
 -- | A main point of the View class is to be able to produce this QueryMorphism.
 transposeView
