@@ -66,7 +66,7 @@ import Data.Functor.Identity
 import Data.GADT.Compare
 import Data.Map.Monoidal (MonoidalMap)
 import qualified Data.Map.Monoidal as Map
-import Data.Maybe
+import Data.Maybe hiding (mapMaybe)
 import Data.Proxy
 import Data.Semigroup
 import Data.Set (Set)
@@ -74,9 +74,10 @@ import qualified Data.Set as Set
 import qualified Data.Some as Some
 import Data.Some hiding (This)
 import Data.These
+import Data.Witherable (Filterable(..))
 import GHC.Generics (Generic)
 import Prelude hiding (lookup, map, null)
-import Reflex (Group(..), Additive, Query(..), QueryMorphism(..), FunctorMaybe(..))
+import Reflex (Group(..), Additive, Query(..), QueryMorphism(..))
 
 ------- The View Class -------
 
@@ -100,7 +101,7 @@ class View (v :: (* -> *) -> *) where
   -- | Transpose a sufficiently-Map-like structure into a container, effectively aggregating
   -- many structures into a single one containing information about which keys each part of it
   -- came from originally.
-  condenseV :: (Foldable t, FunctorMaybe t, Functor t) => t (v g) -> v (Compose t g)
+  condenseV :: (Foldable t, Filterable t, Functor t) => t (v g) -> v (Compose t g)
   -- | Transpose a sufficiently-Map-like structure out of a container, the inverse of condenseV.
   disperseV :: (Align t) => v (Compose t g) -> t (v g)
   -- TODO: Decide whether mapV and traverseV are actually a good idea to provide.
@@ -124,7 +125,7 @@ class View (v :: (* -> *) -> *) where
 transposeView
   :: ( View v
      , Foldable t
-     , FunctorMaybe t
+     , Filterable t
      , Functor t
      , Align t
      , QueryResult (t (v g)) ~ (t (v g'))
@@ -254,7 +255,7 @@ instance (Additive (g (First (Maybe a)))) => Additive (SingleV a g)
 instance View (SingleV a) where
   cropV f (SingleV s) (SingleV i) = SingleV $ f s i
   nullV (SingleV _) = False
-  condenseV :: (Foldable t, FunctorMaybe t, Functor t) => t (SingleV a g) -> SingleV a (Compose t g)
+  condenseV :: (Foldable t, Filterable t, Functor t) => t (SingleV a g) -> SingleV a (Compose t g)
   condenseV m = SingleV . Compose $ fmap unSingleV m
   disperseV :: (Align t) => SingleV a (Compose t g) -> t (SingleV a g)
   disperseV (SingleV (Compose x)) = fmap SingleV x
@@ -401,11 +402,11 @@ instance (Has' Additive k (FlipAp g), Has' Semigroup k (FlipAp g), GCompare k) =
 
 -- | Disperse is a simplified version of View for ordinary containers. This is used as a stepping stone to obtain the View instance for MapV.
 class Disperse row where
-  disperse :: (Foldable col, FunctorMaybe col, Functor col) => col (row a) -> row (col a)
+  disperse :: (Foldable col, Filterable col, Functor col) => col (row a) -> row (col a)
   condense :: (Align col) => row (col a) -> col (row a)
 
 instance Ord k => Disperse (MonoidalMap k) where
-  disperse :: forall col a. (Foldable col, FunctorMaybe col, Functor col)
+  disperse :: forall col a. (Foldable col, Filterable col, Functor col)
            => col (MonoidalMap k a)
            -> MonoidalMap k (col a)
   disperse col = disperse' (Map.MonoidalMap (fold (fmap Map.getMonoidalMap col))) col
@@ -416,13 +417,13 @@ instance Ord k => Disperse (MonoidalMap k) where
         -> MonoidalMap k (col a)
       disperse' folded col' = case findPivot folded of
         None -> Map.MonoidalMap mempty
-        One k _ -> Map.singleton k (fmapMaybe (Map.lookup k) col')
+        One k _ -> Map.singleton k (mapMaybe (Map.lookup k) col')
         Split pivot l r -> uncurry unionDistinctAsc $ (disperse' l *** disperse' r) $ split pivot col'
       split
-        :: (Ord k, FunctorMaybe col)
+        :: (Ord k, Filterable col)
         => k -> col (MonoidalMap k a)
         -> (col (MonoidalMap k a), col (MonoidalMap k a))
-      split pivot col' = unalignProperly $ fmapMaybe (splitOne pivot) col'
+      split pivot col' = unalignProperly $ mapMaybe (splitOne pivot) col'
       splitOne
         :: Ord k
         => k
@@ -474,7 +475,7 @@ instance (GCompare k) => View (MonoidalDMap k) where
   nullV :: MonoidalDMap k s -> Bool
   nullV m = DMap.null m
 
-  condenseV :: forall col g. ( Foldable col, FunctorMaybe col, Functor col )
+  condenseV :: forall col g. ( Foldable col, Filterable col, Functor col )
             => col (MonoidalDMap k g)
             -> MonoidalDMap k (Compose col g)
   condenseV col = condenseD' (fold (fmap unMonoidalDMap col)) col
@@ -497,21 +498,21 @@ instance (GCompare k) => View (MonoidalDMap k) where
   mapMaybeV f (MonoidalDMap m) = collapseNullV $ MonoidalDMap $
     DMap'.mapMaybe f m
 
-condenseD' :: (GCompare k, Foldable t, FunctorMaybe t)
+condenseD' :: (GCompare k, Foldable t, Filterable t)
            => DMap k g
            -> t (MonoidalDMap k g)
            -> MonoidalDMap k (Compose t g)
 condenseD' folded col = case findPivotD folded of
   NoneD -> DMap.empty
-  OneD k _ -> DMap.singleton k (Compose $ fmapMaybe (DMap.lookup k) col)
+  OneD k _ -> DMap.singleton k (Compose $ mapMaybe (DMap.lookup k) col)
   SplitD pivot l r -> uncurry unionDistinctAscD $ (condenseD' l *** condenseD' r) $ splitD pivot col
 
 unionDistinctAscD :: (GCompare k) => MonoidalDMap k g -> MonoidalDMap k g -> MonoidalDMap k g
 unionDistinctAscD = DMap.unionWithKey (\_ x _ -> x)
 
-splitD :: (GCompare k, FunctorMaybe t)
+splitD :: (GCompare k, Filterable t)
        => k x -> t (MonoidalDMap k g) -> (t (MonoidalDMap k g), t (MonoidalDMap k g))
-splitD pivot col = unalignProperly $ fmapMaybe (splitOneD pivot) col
+splitD pivot col = unalignProperly $ mapMaybe (splitOneD pivot) col
 
 splitOneD :: (GCompare k) => k v -> MonoidalDMap k g -> Maybe (These (MonoidalDMap k g) (MonoidalDMap k g))
 splitOneD pivot m =
@@ -547,7 +548,7 @@ instance (Has View k, GCompare k) => View (Vessel k) where
   mapV f (Vessel m) = Vessel (DMap.mapWithKey (\k (FlipAp v) -> has @View k $ FlipAp (mapV f v)) m)
   traverseV :: (Applicative m) => (forall a. f a -> m (g a)) -> Vessel k f -> m (Vessel k g)
   traverseV f m = traverseWithKeyV (\k v -> has @View k $ traverseV f v) m
-  condenseV :: (Foldable t, FunctorMaybe t, Functor t)
+  condenseV :: (Foldable t, Filterable t, Functor t)
             => t (Vessel k g)
             -> Vessel k (Compose t g)
   condenseV col = condenseV' folded col
@@ -562,22 +563,22 @@ instance (Has View k, GCompare k) => View (Vessel k) where
     DMap'.mapMaybeWithKey (\k (FlipAp v) -> has @View k $ FlipAp <$> mapMaybeV f v) m
 
 condenseV' :: forall k t g.
-              ( Has View k, GCompare k, Foldable t, FunctorMaybe t, Functor t)
+              ( Has View k, GCompare k, Foldable t, Filterable t, Functor t)
            => DMap k (FlipAp g)
            -> t (Vessel k g)
            -> Vessel k (Compose t g)
 condenseV' folded col =
   case findPivotD folded of
     NoneD -> emptyV
-    OneD (k :: k v) _ -> singletonV k (has @View k (condenseV $ fmapMaybe (lookupV k) col))
+    OneD (k :: k v) _ -> singletonV k (has @View k (condenseV $ mapMaybe (lookupV k) col))
     SplitD pivot l r -> uncurry unionDistinctAscV $ (condenseV' l *** condenseV' r) $ splitV pivot col
 
 unionDistinctAscV :: (GCompare k) => Vessel k g -> Vessel k g -> Vessel k g
 unionDistinctAscV (Vessel l) (Vessel r) = Vessel $ DMap.unionWithKey (\_ x _ -> x) l r
 
-splitV :: forall k t g x. (GCompare k, FunctorMaybe t)
+splitV :: forall k t g x. (GCompare k, Filterable t)
        => k x -> t (Vessel k g) -> (t (Vessel k g), t (Vessel k g))
-splitV pivot col = unalignProperly $ fmapMaybe (splitOneV pivot) col
+splitV pivot col = unalignProperly $ mapMaybe (splitOneV pivot) col
 
 splitOneV :: (GCompare k) => k v -> Vessel k g -> Maybe (These (Vessel k g) (Vessel k g))
 splitOneV pivot m =
@@ -631,11 +632,6 @@ instance Group g => Group (Const g x) where
 
 instance Additive g => Additive (Const g x)
 
-instance (Ord k, Group v) => Group (MonoidalMap k v) where
-  negateG m = Map.map negateG m
-
-instance (Ord k, Additive v) => Additive (MonoidalMap k v)
-
 instance (Semigroup (f (g a))) => Semigroup (Compose f g a) where
   (Compose x) <> (Compose y) = Compose (x <> y)
 
@@ -646,8 +642,8 @@ instance (Monoid (f (g a))) => Monoid (Compose f g a) where
 --------------------------------------------------
 
 -- TODO: Contribute this to the 'these' package and/or sort out its generalisation.
-unalignProperly :: (FunctorMaybe f) => f (These a b) -> (f a, f b)
-unalignProperly f = (fmapMaybe leftThese f, fmapMaybe rightThese f)
+unalignProperly :: (Filterable f) => f (These a b) -> (f a, f b)
+unalignProperly f = (mapMaybe leftThese f, mapMaybe rightThese f)
   where
     leftThese :: These a b -> Maybe a
     leftThese = these (\x -> Just x) (\_ -> Nothing) (\x _ -> Just x)
