@@ -24,13 +24,13 @@
 module Data.Vessel
   ( Vessel(..)
   , View(..)
+  , EmptyView(..)
   , Selectable(..)
   , FlipAp(..)
   , IdentityV(..)
   , SingleV(..)
   , MapV(..)
   , DMapV(..)
-  , emptyV
   , singletonV
   , lookupV
   , buildV
@@ -128,6 +128,15 @@ class View (v :: (* -> *) -> *) where
   -- provided function, keeping only the 'Just' results and returing 'Nothing'
   -- if no leaves are kept.
   alignWithMaybeV :: (forall a. These (f a) (g a) -> Maybe (h a)) -> v f -> v g -> Maybe (v h)
+  -- | Map over all the leaves of two containers, combining the leaves with the
+  -- provided function
+  alignWithV :: (forall a. These (f a) (g a) -> h a) -> v f -> v g -> v h
+
+-- | A type `v` supports EmptyView iff it is able to contain no information.
+class View v => EmptyView v where
+  -- Law: nullV emptyV == True
+  --TODO: More laws
+  emptyV :: v f
 
 alignWithMV
   :: forall m v f g h
@@ -251,6 +260,7 @@ instance View (IdentityV a) where
   traverseV f (IdentityV x) = IdentityV <$> f x
   mapMaybeV f (IdentityV x) = IdentityV <$> f x
   alignWithMaybeV f (IdentityV x) (IdentityV y) = IdentityV <$> f (These x y)
+  alignWithV f (IdentityV x) (IdentityV y) = IdentityV $ f $ These x y
 
 instance ToJSON (g a) => ToJSON (IdentityV a g)
 
@@ -290,6 +300,7 @@ instance View (SingleV a) where
   traverseV f (SingleV x) = SingleV <$> f x
   mapMaybeV f (SingleV x) = SingleV <$> f x
   alignWithMaybeV f (SingleV x) (SingleV y) = SingleV <$> f (These x y)
+  alignWithV f (SingleV x) (SingleV y) = SingleV $ f $ These x y
 
 instance ToJSON (g (First (Maybe a))) => ToJSON (SingleV a g)
 
@@ -308,6 +319,10 @@ instance (Ord k) => View (MapV k v) where
   traverseV f (MapV m) = MapV <$> traverse f m
   mapMaybeV f (MapV m) = collapseNullV $ MapV $ Map.mapMaybe f m
   alignWithMaybeV f (MapV (MonoidalMap a)) (MapV (MonoidalMap b)) = collapseNullV $ MapV $ MonoidalMap $ Map'.mapMaybe id $ alignWith f a b
+  alignWithV f (MapV (MonoidalMap a)) (MapV (MonoidalMap b)) = MapV $ MonoidalMap $ alignWith f a b
+
+instance (Ord k) => EmptyView (MapV k v) where
+  emptyV = MapV Map.empty
 
 instance (ToJSON k, ToJSON (g v), Ord k) => ToJSON (MapV k v g) where
   toJSON = toJSON . Map.toList . unMapV
@@ -337,6 +352,9 @@ instance (GCompare k) => View (DMapV k v) where
   mapMaybeV f (DMapV (MonoidalDMap m)) = collapseNullV $ DMapV $ MonoidalDMap $
     DMap'.mapMaybe (fmap Compose . f . getCompose) m
 --  alignWithMaybeV f (DMapV (MonoidalDMap a)) (DMapV (MonoidalDMap b)) = collapseNullV $ DMapV $ MonoidalDMap $ DMap'.mapMaybe _ $ DMap.alignWith f a b
+
+instance (GCompare k) => EmptyView (DMapV k v) where
+  emptyV = DMapV DMap.empty
 
 ------- Selectable convenience class -------
 
@@ -380,9 +398,6 @@ instance (GCompare k) => Selectable (DMapV k v) (Set (Some k)) where
 
 singletonV :: View v => k v -> v g -> Vessel k g
 singletonV k v = Vessel $ if nullV v then DMap.empty else DMap.singleton k (FlipAp v)
-
-emptyV :: Vessel k g
-emptyV = Vessel DMap.empty
 
 lookupV :: (GCompare k) => k v -> Vessel k g -> Maybe (v g)
 lookupV k (Vessel m) = unFlipAp <$> DMap.lookup k m
@@ -530,6 +545,9 @@ instance (GCompare k) => View (MonoidalDMap k) where
   mapMaybeV f (MonoidalDMap m) = collapseNullV $ MonoidalDMap $
     DMap'.mapMaybe f m
 
+instance (GCompare k) => EmptyView (MonoidalDMap k) where
+  emptyV = DMap.empty
+
 condenseD' :: (GCompare k, Foldable t, Filterable t)
            => DMap k g
            -> t (MonoidalDMap k g)
@@ -600,9 +618,22 @@ instance (Has View k, GCompare k) => View (Vessel k) where
           That (FlipAp b) -> mapMaybeV (f . That) b
           These (FlipAp a) (FlipAp b) -> alignWithMaybeV f a b
     in alignWithKeyMaybeMonoidalDMap g a b
+  alignWithV (f :: forall a. These (f a) (g a) -> h a) (Vessel a) (Vessel b) = Vessel $
+    let g :: forall v. k v -> These (FlipAp f v) (FlipAp g v) -> FlipAp h v
+        g k = has @View k $ FlipAp . \case
+          This (FlipAp a) -> mapV (f . This) a
+          That (FlipAp b) -> mapV (f . That) b
+          These (FlipAp a) (FlipAp b) -> alignWithV f a b
+    in alignWithKeyMonoidalDMap g a b
+
+instance (Has View k, GCompare k) => EmptyView (Vessel k) where
+  emptyV = Vessel DMap.empty
 
 alignWithKeyMaybeMonoidalDMap :: GCompare k => (forall a. k a -> These (f a) (g a) -> Maybe (h a)) -> MonoidalDMap k f -> MonoidalDMap k g -> MonoidalDMap k h
 alignWithKeyMaybeMonoidalDMap f (MonoidalDMap a) (MonoidalDMap b) = MonoidalDMap $ alignWithKeyMaybeDMap f a b
+
+alignWithKeyMonoidalDMap :: GCompare k => (forall a. k a -> These (f a) (g a) -> h a) -> MonoidalDMap k f -> MonoidalDMap k g -> MonoidalDMap k h
+alignWithKeyMonoidalDMap f (MonoidalDMap a) (MonoidalDMap b) = MonoidalDMap $ alignWithKeyDMap f a b
 
 data DThese f g a = DThis (f a) | DThat (g a) | DThese (f a) (g a)
 
@@ -614,6 +645,9 @@ dtheseToThese = \case
 
 alignWithKeyMaybeDMap :: GCompare k => (forall a. k a -> These (f a) (g a) -> Maybe (h a)) -> DMap k f -> DMap k g -> DMap k h
 alignWithKeyMaybeDMap f a b = DMap'.mapMaybeWithKey (\k t -> f k $ dtheseToThese t) $ DMap'.unionWithKey (\_ (DThis x) (DThat y) -> DThese x y) (DMap'.map DThis a) (DMap'.map DThat b)
+
+alignWithKeyDMap :: GCompare k => (forall a. k a -> These (f a) (g a) -> h a) -> DMap k f -> DMap k g -> DMap k h
+alignWithKeyDMap f a b = DMap'.mapWithKey (\k t -> f k $ dtheseToThese t) $ DMap'.unionWithKey (\_ (DThis x) (DThat y) -> DThese x y) (DMap'.map DThis a) (DMap'.map DThat b)
 
 condenseV' :: forall k t g.
               ( Has View k, GCompare k, Foldable t, Filterable t, Functor t)
