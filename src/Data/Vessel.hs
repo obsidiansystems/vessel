@@ -334,7 +334,14 @@ instance (FromJSON k, FromJSON (g v), Ord k) => FromJSON (MapV k v g) where
 
 -- | A functor-indexed container corrresponding to DMap k v.
 newtype DMapV (k :: * -> *) (v :: * -> *) g = DMapV { unDMapV :: MonoidalDMap k (Compose g v) }
-  deriving (Eq, Ord, Read, Semigroup, Monoid, Group, Additive, Generic)
+  deriving (Generic)
+
+deriving instance (GCompare k, Has' Eq k (Compose g v)) => Eq (DMapV k v g)
+deriving instance (GCompare k, Has' Eq k (Compose g v), Has' Ord k (Compose g v)) => Ord (DMapV k v g)
+deriving instance (GCompare k, Has' Semigroup k (Compose g v)) => Semigroup (DMapV k v g)
+deriving instance (GCompare k, Has' Semigroup k (Compose g v), Has' Monoid k (Compose g v)) => Monoid (DMapV k v g)
+deriving instance (GCompare k, Has' Semigroup k (Compose g v), Has' Monoid k (Compose g v), Has' Group k (Compose g v)) => Group (DMapV k v g)
+deriving instance (GCompare k, Has' Semigroup k (Compose g v), Has' Monoid k (Compose g v), Has' Group k (Compose g v), Has' Additive k (Compose g v)) => Additive (DMapV k v g)
 
 instance (Has' ToJSON k (Compose g v), ForallF ToJSON k) => ToJSON (DMapV k v g)
 
