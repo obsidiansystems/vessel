@@ -24,20 +24,23 @@
 module Data.Vessel
   ( Vessel(..)
   , View(..)
+  , EmptyView(..)
   , Selectable(..)
   , FlipAp(..)
   , IdentityV(..)
   , SingleV(..)
   , MapV(..)
   , DMapV(..)
-  , emptyV
   , singletonV
   , lookupV
   , buildV
   , mapMaybeWithKeyV
   , traverseWithKeyV
+  , traverseWithKeyV_
   , intersectionWithKeyV
   , mapDecomposedV
+  , alignWithMV
+  , collapseNullV
   , VSum (..)
   , toListV
   , fromListV
@@ -64,7 +67,9 @@ import Data.Functor.Compose
 import Data.Functor.Const
 import Data.Functor.Identity
 import Data.GADT.Compare
-import Data.Map.Monoidal (MonoidalMap)
+import Data.GADT.Show
+import qualified Data.Map as Map'
+import Data.Map.Monoidal (MonoidalMap (..))
 import qualified Data.Map.Monoidal as Map
 import Data.Proxy
 import Data.Semigroup
@@ -77,6 +82,8 @@ import Data.Witherable (Filterable(..))
 import GHC.Generics (Generic)
 import Prelude hiding (lookup, map, null)
 import Reflex (Group(..), Additive, Query(..), QueryMorphism(..))
+import Data.AppendMap () -- For Group and Additive instances for MonoidalMap
+import Data.Maybe (fromMaybe)
 
 ------- The View Class -------
 
@@ -107,7 +114,7 @@ class View (v :: (* -> *) -> *) where
   -- They may actually help people write operations which are inefficient.
   -- | Given a structure specifying a query, and a structure representing a view of data,
   -- restrict the view to only those parts which satisfy the query. (Essentially intersection of Maps.)
-  cropV :: (forall a. s a -> i a -> r a) -> v s -> v i -> v r
+  cropV :: (forall a. s a -> i a -> r a) -> v s -> v i -> Maybe (v r)
   -- | We also want a way to determine if the container is empty, because shipping empty containers
   -- around is a bad idea.
   nullV :: v i -> Bool
@@ -119,6 +126,30 @@ class View (v :: (* -> *) -> *) where
   -- | Map over all the leaves of a container, keeping only the 'Just' results
   -- and returing 'Nothing' if no leaves are kept.
   mapMaybeV :: (forall a. f a -> Maybe (g a)) -> v f -> Maybe (v g)
+  -- | Map over all the leaves of two containers, combining the leaves with the
+  -- provided function, keeping only the 'Just' results and returing 'Nothing'
+  -- if no leaves are kept.
+  alignWithMaybeV :: (forall a. These (f a) (g a) -> Maybe (h a)) -> v f -> v g -> Maybe (v h)
+  -- | Map over all the leaves of two containers, combining the leaves with the
+  -- provided function
+  alignWithV :: (forall a. These (f a) (g a) -> h a) -> v f -> v g -> v h
+
+-- | A type `v` supports EmptyView iff it is able to contain no information.
+class View v => EmptyView v where
+  -- Law: nullV emptyV == True
+  --TODO: More laws
+  emptyV :: v f
+
+alignWithMV
+  :: forall m v f g h
+  .  (View v, Applicative m)
+  => (forall a. These (f a) (g a) -> m (h a))
+  -> v f
+  -> v g
+  -> m (Maybe (v h))
+alignWithMV f a b = traverse (traverseV getCompose) $ alignWithMaybeV g a b
+  where g :: forall a. These (f a) (g a) -> Maybe (Compose m h a)
+        g = Just . Compose . f
 
 -- | A main point of the View class is to be able to produce this QueryMorphism.
 transposeView
@@ -149,6 +180,7 @@ transposeView = QueryMorphism
 -- The keys of a vessel are indexed by a functor-parametric container type, so they have kind ((* -> *) -> *) -> *
 -- Vessel itself, for any such key type, produces a functor-parametric container, so it has kind
 -- (((* -> *) -> *) -> *) -> (* -> *) -> *
+-- Law: None of the items in the Vessel's MonoidalDMap are nullV
 newtype Vessel (k :: ((* -> *) -> *) -> *) (g :: * -> *) = Vessel { unVessel :: MonoidalDMap k (FlipAp g) }
   deriving (Generic)
 
@@ -157,15 +189,17 @@ newtype FlipAp (g :: k) (v :: k -> *) = FlipAp { unFlipAp :: v g }
 
 deriving instance (GCompare k, Has' Eq k (FlipAp g)) => Eq (Vessel k g)
 
+deriving instance (ForallF Show k, GShow k, Has' Show k (FlipAp g)) => Show (Vessel k g)
+
 -- TODO: Ord, Read, Show
 
 instance (Has View k, GCompare k, Has' Semigroup k (FlipAp Identity)) => Query (Vessel k (Const x)) where
   type QueryResult (Vessel k (Const x)) = Vessel k Identity
-  crop = cropV (\_ a -> a)
+  crop q r = fromMaybe emptyV $ cropV (\_ a -> a) q r --TODO
 
 instance (Has View k, GCompare k, Has' Semigroup k (FlipAp Identity)) => Query (Vessel k Proxy) where
   type QueryResult (Vessel k Proxy) = Vessel k Identity
-  crop = cropV (\_ a -> a)
+  crop q r = fromMaybe emptyV $ cropV (\_ a -> a) q r --TODO
 
 -- TODO: figure out how to write a single instance for the case of Compose which depends on a Query instance for the right hand
 -- composed functor... and/or let's replace Query with something more appropriate since it's pretty uniform what we want the crop
@@ -180,7 +214,7 @@ instance ( Has View k
          , Query (Vessel k g) )
         => Query (Vessel k (Compose c g)) where
   type QueryResult (Vessel k (Compose c g)) = Vessel k (Compose c (VesselLeafWrapper (QueryResult (Vessel k g))))
-  crop = cropV (\_ a -> a)
+  crop q r = fromMaybe emptyV $ cropV (\_ a -> a) q r
 
 -- A single Vessel key/value pair, essentially a choice of container type, together with a corresponding container.
 data VSum (k :: ((* -> *) -> *) -> *) (g :: * -> *) = forall v. k v :~> v g
@@ -188,8 +222,10 @@ data VSum (k :: ((* -> *) -> *) -> *) (g :: * -> *) = forall v. k v :~> v g
 toListV :: Vessel k g -> [VSum k g]
 toListV (Vessel m) = fmap (\(k :=> FlipAp v) -> k :~> v) (DMap.toList m)
 
-fromListV :: (GCompare k) => [VSum k g] -> Vessel k g
-fromListV vs = Vessel (DMap.fromListWithKey (\_ _ v -> v) $ fmap (\(k :~> v) -> k :=> FlipAp v) vs)
+fromListV :: (GCompare k, Has View k) => [VSum k g] -> Vessel k g
+fromListV vs = Vessel $
+  DMap.fromListWithKey (\_ _ v -> v) $
+  mapMaybe (\(k :~> v) -> has @View k $ if nullV v then Nothing else Just $ k :=> FlipAp v) vs
 
 ------- Serialisation -------
 
@@ -208,7 +244,7 @@ instance forall k g. (FromJSON (Some k), HasV FromJSON k g) => FromJSON (VSum k 
 instance (GCompare k, ForallF ToJSON k, HasV ToJSON k g) => ToJSON (Vessel k g) where
   toJSON v = toJSON (toListV v)
 
-instance (GCompare k, FromJSON (Some k), HasV FromJSON k g) => FromJSON (Vessel k g) where
+instance (GCompare k, FromJSON (Some k), HasV FromJSON k g, Has View k) => FromJSON (Vessel k g) where
   parseJSON x = fmap fromListV (parseJSON x)
 
 ------- Simple structure components -------
@@ -218,13 +254,15 @@ newtype IdentityV (a :: *) (g :: * -> *) = IdentityV { unIdentityV :: g a }
   deriving (Eq, Ord, Show, Read, Semigroup, Monoid, Group, Additive, Generic)
 
 instance View (IdentityV a) where
-  cropV f (IdentityV s) (IdentityV x) = IdentityV $ f s x
+  cropV f (IdentityV s) (IdentityV x) = Just $ IdentityV $ f s x
   nullV _ = False
   condenseV m = IdentityV (Compose (fmap unIdentityV m))
   disperseV (IdentityV (Compose m)) = fmap IdentityV m
   mapV f (IdentityV x) = IdentityV (f x)
   traverseV f (IdentityV x) = IdentityV <$> f x
   mapMaybeV f (IdentityV x) = IdentityV <$> f x
+  alignWithMaybeV f (IdentityV x) (IdentityV y) = IdentityV <$> f (These x y)
+  alignWithV f (IdentityV x) (IdentityV y) = IdentityV $ f $ These x y
 
 instance ToJSON (g a) => ToJSON (IdentityV a g)
 
@@ -252,7 +290,7 @@ instance (Group (g (First (Maybe a)))) => Group (SingleV a g) where
 instance (Additive (g (First (Maybe a)))) => Additive (SingleV a g)
 
 instance View (SingleV a) where
-  cropV f (SingleV s) (SingleV i) = SingleV $ f s i
+  cropV f (SingleV s) (SingleV i) = Just $ SingleV $ f s i
   nullV (SingleV _) = False
   condenseV :: (Foldable t, Filterable t, Functor t) => t (SingleV a g) -> SingleV a (Compose t g)
   condenseV m = SingleV . Compose $ fmap unSingleV m
@@ -263,6 +301,8 @@ instance View (SingleV a) where
   traverseV :: (Applicative m) => (forall x. f x -> m (g x)) -> SingleV a f -> m (SingleV a g)
   traverseV f (SingleV x) = SingleV <$> f x
   mapMaybeV f (SingleV x) = SingleV <$> f x
+  alignWithMaybeV f (SingleV x) (SingleV y) = SingleV <$> f (These x y)
+  alignWithV f (SingleV x) (SingleV y) = SingleV $ f $ These x y
 
 instance ToJSON (g (First (Maybe a))) => ToJSON (SingleV a g)
 
@@ -273,13 +313,18 @@ newtype MapV k v g = MapV { unMapV :: MonoidalMap k (g v) }
   deriving (Eq, Ord, Show, Read, Semigroup, Monoid, Group, Additive, Generic)
 
 instance (Ord k) => View (MapV k v) where
-  cropV f (MapV s) (MapV i) = MapV (Map.intersectionWithKey (\_ x y -> f x y) s i)
+  cropV f (MapV s) (MapV i) = collapseNullV $ MapV (Map.intersectionWithKey (\_ x y -> f x y) s i)
   nullV (MapV m) = Map.null m
   condenseV m = MapV . fmap Compose . disperse . fmap unMapV $ m
   disperseV (MapV m) = fmap MapV . condense . fmap getCompose $ m
   mapV f (MapV m) = MapV $ Map.map f m
   traverseV f (MapV m) = MapV <$> traverse f m
   mapMaybeV f (MapV m) = collapseNullV $ MapV $ Map.mapMaybe f m
+  alignWithMaybeV f (MapV (MonoidalMap a)) (MapV (MonoidalMap b)) = collapseNullV $ MapV $ MonoidalMap $ Map'.mapMaybe id $ alignWith f a b
+  alignWithV f (MapV (MonoidalMap a)) (MapV (MonoidalMap b)) = MapV $ MonoidalMap $ alignWith f a b
+
+instance (Ord k) => EmptyView (MapV k v) where
+  emptyV = MapV Map.empty
 
 instance (ToJSON k, ToJSON (g v), Ord k) => ToJSON (MapV k v g) where
   toJSON = toJSON . Map.toList . unMapV
@@ -294,15 +339,10 @@ newtype DMapV (k :: * -> *) (v :: * -> *) g = DMapV { unDMapV :: MonoidalDMap k 
   deriving (Generic)
 
 deriving instance (GCompare k, Has' Eq k (Compose g v)) => Eq (DMapV k v g)
-
 deriving instance (GCompare k, Has' Eq k (Compose g v), Has' Ord k (Compose g v)) => Ord (DMapV k v g)
-
 deriving instance (GCompare k, Has' Semigroup k (Compose g v)) => Semigroup (DMapV k v g)
-
 deriving instance (GCompare k, Has' Semigroup k (Compose g v), Has' Monoid k (Compose g v)) => Monoid (DMapV k v g)
-
 deriving instance (GCompare k, Has' Semigroup k (Compose g v), Has' Monoid k (Compose g v), Has' Group k (Compose g v)) => Group (DMapV k v g)
-
 deriving instance (GCompare k, Has' Semigroup k (Compose g v), Has' Monoid k (Compose g v), Has' Group k (Compose g v), Has' Additive k (Compose g v)) => Additive (DMapV k v g)
 
 instance (Has' ToJSON k (Compose g v), ForallF ToJSON k) => ToJSON (DMapV k v g)
@@ -312,7 +352,7 @@ instance (Has' FromJSON k (Compose g v), FromJSON (Some k), GCompare k) => FromJ
 deriving instance (ForallF Show k, Has' Show k (Compose g v)) => Show (DMapV k v g)
 
 instance (GCompare k) => View (DMapV k v) where
-  cropV f (DMapV s) (DMapV i) = DMapV (DMap.intersectionWithKey (\_ (Compose x) (Compose y) -> Compose $ f x y) s i)
+  cropV f (DMapV s) (DMapV i) = collapseNullV $ DMapV (DMap.intersectionWithKey (\_ (Compose x) (Compose y) -> Compose $ f x y) s i)
   nullV (DMapV m) = DMap.null m
   condenseV m = DMapV . DMap.map assocLCompose . condenseV . fmap unDMapV $ m
   disperseV (DMapV m) = fmap DMapV . disperseV . DMap.map assocRCompose $ m
@@ -320,6 +360,10 @@ instance (GCompare k) => View (DMapV k v) where
   traverseV f (DMapV m) = DMapV <$> DMap.traverseWithKey (\_ (Compose x) -> Compose <$> f x) m
   mapMaybeV f (DMapV (MonoidalDMap m)) = collapseNullV $ DMapV $ MonoidalDMap $
     DMap'.mapMaybe (fmap Compose . f . getCompose) m
+--  alignWithMaybeV f (DMapV (MonoidalDMap a)) (DMapV (MonoidalDMap b)) = collapseNullV $ DMapV $ MonoidalDMap $ DMap'.mapMaybe _ $ DMap.alignWith f a b
+
+instance (GCompare k) => EmptyView (DMapV k v) where
+  emptyV = DMapV DMap.empty
 
 ------- Selectable convenience class -------
 
@@ -361,27 +405,40 @@ instance (GCompare k) => Selectable (DMapV k v) (Set (Some k)) where
 
 ------- Operations on Vessel -------
 
-singletonV :: k v -> v g -> Vessel k g
-singletonV k v = Vessel (DMap.singleton k (FlipAp v))
-
-emptyV :: Vessel k g
-emptyV = Vessel (DMap.empty)
+singletonV :: View v => k v -> v g -> Vessel k g
+singletonV k v = Vessel $ if nullV v then DMap.empty else DMap.singleton k (FlipAp v)
 
 lookupV :: (GCompare k) => k v -> Vessel k g -> Maybe (v g)
 lookupV k (Vessel m) = unFlipAp <$> DMap.lookup k m
 
-mapMaybeWithKeyV :: (GCompare k) => (forall v. k v -> v g -> Maybe (v g')) -> Vessel k g -> Vessel k g'
-mapMaybeWithKeyV f (Vessel m) = Vessel $ DMap.mapMaybeWithKey (\k (FlipAp x) -> FlipAp <$> f k x) m
+mapMaybeWithKeyV :: (GCompare k, Has View k) => (forall v. View v => k v -> v g -> Maybe (v g')) -> Vessel k g -> Vessel k g'
+mapMaybeWithKeyV f (Vessel m) = Vessel $ DMap.mapMaybeWithKey (\k (FlipAp x) -> has @View k $ FlipAp <$> (collapseNullV =<< f k x)) m
 
-traverseWithKeyV :: (GCompare k, Applicative m) => (forall v. k v -> v g -> m (v h)) -> Vessel k g -> m (Vessel k h)
-traverseWithKeyV f (Vessel x) = Vessel <$> DMap.traverseWithKey (\k (FlipAp v) -> FlipAp <$> f k v) x
+traverseWithKeyV :: (GCompare k, Has View k, Applicative m) => (forall v. View v => k v -> v g -> m (v h)) -> Vessel k g -> m (Vessel k h)
+traverseWithKeyV f (Vessel x) = Vessel . filterNullFlipAps <$> DMap.traverseWithKey (\k (FlipAp v) -> has @View k $ FlipAp <$> f k v) x
 
-buildV :: (GCompare k, Applicative m) => Vessel k g -> (forall v. k v -> v g -> m (v h)) -> m (Vessel k h)
+traverseWithKeyV_ :: (GCompare k, Has View k, Applicative m) => (forall v. View v => k v -> v g -> m ()) -> Vessel k g -> m ()
+traverseWithKeyV_ f (Vessel x) = void $ DMap.traverseWithKey (\k (FlipAp v) -> has @View k $ Const () <$ f k v) x
+
+filterNullFlipAps :: (GCompare k, Has View k) => MonoidalDMap k (FlipAp f) -> MonoidalDMap k (FlipAp f)
+filterNullFlipAps = DMap.mapMaybeWithKey (\k (FlipAp v) -> has @View k $ FlipAp <$> collapseNullV v)
+
+buildV :: (GCompare k, Has View k, Applicative m) => Vessel k g -> (forall v. k v -> v g -> m (v h)) -> m (Vessel k h)
 buildV v f = traverseWithKeyV f v
 
-intersectionWithKeyV :: (GCompare k) => (forall v. k v -> v g -> v g' -> v h) -> Vessel k g -> Vessel k g' -> Vessel k h
+intersectionWithKeyV :: (GCompare k, Has View k) => (forall v. View v => k v -> v g -> v g' -> v h) -> Vessel k g -> Vessel k g' -> Vessel k h
 intersectionWithKeyV f (Vessel m) (Vessel m') = Vessel $
-  DMap.intersectionWithKey (\k (FlipAp x) (FlipAp y) -> FlipAp (f k x y)) m m'
+  filterNullFlipAps $
+  DMap.intersectionWithKey (\k (FlipAp x) (FlipAp y) -> has @View k $ FlipAp (f k x y)) m m'
+
+intersectionMaybeWithKeyV :: (GCompare k, Has View k) => (forall v. View v => k v -> v g -> v g' -> Maybe (v h)) -> Vessel k g -> Vessel k g' -> Vessel k h
+intersectionMaybeWithKeyV f (Vessel m) (Vessel m') = Vessel $
+  filterNullFlipAps $
+  intersectionDMapMaybeWithKey (\k (FlipAp x) (FlipAp y) -> has @View k $ FlipAp <$> f k x y) m m'
+
+--TODO: Upstream
+intersectionDMapMaybeWithKey :: GCompare k => (forall x. k x -> a x -> b x -> Maybe (c x)) -> MonoidalDMap k a -> MonoidalDMap k b -> MonoidalDMap k c
+intersectionDMapMaybeWithKey f a b = DMap.mapMaybeWithKey (\_ -> getCompose) $ DMap.intersectionWithKey (\k x y -> Compose $ f k x y) a b
 
 ------- Instances for FlipAp -------
 
@@ -399,17 +456,17 @@ instance Additive (v g) => Additive (FlipAp g v)
 
 ------- Instances for Vessel -------
 
-instance (Has' Semigroup k (FlipAp g), GCompare k) => Semigroup (Vessel k g) where
-  Vessel m <> Vessel n = Vessel (m <> n)
+instance (Has' Semigroup k (FlipAp g), GCompare k, Has View k) => Semigroup (Vessel k g) where
+  Vessel m <> Vessel n = Vessel $ filterNullFlipAps $ m <> n
 
-instance (Has' Semigroup k (FlipAp g), GCompare k) => Monoid (Vessel k g) where
-  mempty = Vessel (DMap.empty)
+instance (Has' Semigroup k (FlipAp g), GCompare k, Has View k) => Monoid (Vessel k g) where
+  mempty = Vessel DMap.empty
   mappend = (<>)
 
-instance (Has' Semigroup k (FlipAp g), Has' Group k (FlipAp g), GCompare k) => Group (Vessel k g) where
-  negateG (Vessel m) = Vessel (negateG m)
+instance (Has' Semigroup k (FlipAp g), Has' Group k (FlipAp g), GCompare k, Has View k) => Group (Vessel k g) where
+  negateG (Vessel m) = Vessel (negateG m) --TODO: Do we know that nullV can't be the result of negateG?
 
-instance (Has' Additive k (FlipAp g), Has' Semigroup k (FlipAp g), GCompare k) => Additive (Vessel k g)
+instance (Has' Additive k (FlipAp g), Has' Semigroup k (FlipAp g), GCompare k, Has View k) => Additive (Vessel k g)
 
 -- | Disperse is a simplified version of View for ordinary containers. This is used as a stepping stone to obtain the View instance for MapV.
 class Disperse row where
@@ -480,8 +537,8 @@ unionDistinctAsc = Map.unionWith (\x _ -> x)
 ------- The View instance for MonoidalDMap -------
 
 instance (GCompare k) => View (MonoidalDMap k) where
-  cropV :: (forall a. s a -> i a -> r a) -> MonoidalDMap k s -> MonoidalDMap k i -> MonoidalDMap k r
-  cropV f = DMap.intersectionWithKey (\_ s i -> f s i)
+  cropV :: (forall a. s a -> i a -> r a) -> MonoidalDMap k s -> MonoidalDMap k i -> Maybe (MonoidalDMap k r)
+  cropV f a b = collapseNullV $ DMap.intersectionWithKey (\_ s i -> f s i) a b
 
   nullV :: MonoidalDMap k s -> Bool
   nullV m = DMap.null m
@@ -508,6 +565,9 @@ instance (GCompare k) => View (MonoidalDMap k) where
 
   mapMaybeV f (MonoidalDMap m) = collapseNullV $ MonoidalDMap $
     DMap'.mapMaybe f m
+
+instance (GCompare k) => EmptyView (MonoidalDMap k) where
+  emptyV = DMap.empty
 
 condenseD' :: (GCompare k, Foldable t, Filterable t)
            => DMap k g
@@ -551,8 +611,8 @@ findPivotD m = case m of
 ------- The View instance for Vessel itself --------
 
 instance (Has View k, GCompare k) => View (Vessel k) where
-  cropV :: (forall a. s a -> i a -> r a) -> Vessel k s -> Vessel k i -> Vessel k r
-  cropV f sv iv = intersectionWithKeyV (\k s i -> has @View k (cropV f s i)) sv iv
+  cropV :: (forall a. s a -> i a -> r a) -> Vessel k s -> Vessel k i -> Maybe (Vessel k r)
+  cropV f sv iv = collapseNullV $ intersectionMaybeWithKeyV (\k s i -> has @View k (cropV f s i)) sv iv
   nullV :: Vessel k i -> Bool
   nullV (Vessel m) = DMap.null m
   mapV :: (forall a. f a -> g a) -> Vessel k f -> Vessel k g
@@ -567,11 +627,48 @@ instance (Has View k, GCompare k) => View (Vessel k) where
   disperseV :: (Align t) => Vessel k (Compose t g) -> t (Vessel k g)
   disperseV row = case findPivotD (unMonoidalDMap (unVessel row)) of
     NoneD -> nil
-    OneD k (FlipAp v) -> fmap (singletonV k) (has @View k (disperseV v))
+    OneD k (FlipAp v) -> has @View k $ fmap (singletonV k) (disperseV v)
     SplitD pivot _l _r -> uncurry (alignWith (mergeThese unionDistinctAscV)) $
-      disperseV *** disperseV $ splitLTV pivot row
+      disperseV *** disperseV $ has @View pivot $ splitLTV pivot row
   mapMaybeV f (Vessel (MonoidalDMap m)) = collapseNullV $ Vessel $ MonoidalDMap $
     DMap'.mapMaybeWithKey (\k (FlipAp v) -> has @View k $ FlipAp <$> mapMaybeV f v) m
+  alignWithMaybeV (f :: forall a. These (f a) (g a) -> Maybe (h a)) (Vessel a) (Vessel b) = collapseNullV $ Vessel $
+    let g :: forall v. k v -> These (FlipAp f v) (FlipAp g v) -> Maybe (FlipAp h v)
+        g k = has @View k $ fmap FlipAp . \case
+          This (FlipAp a) -> mapMaybeV (f . This) a
+          That (FlipAp b) -> mapMaybeV (f . That) b
+          These (FlipAp a) (FlipAp b) -> alignWithMaybeV f a b
+    in alignWithKeyMaybeMonoidalDMap g a b
+  alignWithV (f :: forall a. These (f a) (g a) -> h a) (Vessel a) (Vessel b) = Vessel $
+    let g :: forall v. k v -> These (FlipAp f v) (FlipAp g v) -> FlipAp h v
+        g k = has @View k $ FlipAp . \case
+          This (FlipAp a) -> mapV (f . This) a
+          That (FlipAp b) -> mapV (f . That) b
+          These (FlipAp a) (FlipAp b) -> alignWithV f a b
+    in alignWithKeyMonoidalDMap g a b
+
+instance (Has View k, GCompare k) => EmptyView (Vessel k) where
+  emptyV = Vessel DMap.empty
+
+alignWithKeyMaybeMonoidalDMap :: GCompare k => (forall a. k a -> These (f a) (g a) -> Maybe (h a)) -> MonoidalDMap k f -> MonoidalDMap k g -> MonoidalDMap k h
+alignWithKeyMaybeMonoidalDMap f (MonoidalDMap a) (MonoidalDMap b) = MonoidalDMap $ alignWithKeyMaybeDMap f a b
+
+alignWithKeyMonoidalDMap :: GCompare k => (forall a. k a -> These (f a) (g a) -> h a) -> MonoidalDMap k f -> MonoidalDMap k g -> MonoidalDMap k h
+alignWithKeyMonoidalDMap f (MonoidalDMap a) (MonoidalDMap b) = MonoidalDMap $ alignWithKeyDMap f a b
+
+data DThese f g a = DThis (f a) | DThat (g a) | DThese (f a) (g a)
+
+dtheseToThese :: DThese f g a -> These (f a) (g a)
+dtheseToThese = \case
+  DThis a -> This a
+  DThat b -> That b
+  DThese a b -> These a b
+
+alignWithKeyMaybeDMap :: GCompare k => (forall a. k a -> These (f a) (g a) -> Maybe (h a)) -> DMap k f -> DMap k g -> DMap k h
+alignWithKeyMaybeDMap f a b = DMap'.mapMaybeWithKey (\k t -> f k $ dtheseToThese t) $ DMap'.unionWithKey (\_ (DThis x) (DThat y) -> DThese x y) (DMap'.map DThis a) (DMap'.map DThat b)
+
+alignWithKeyDMap :: GCompare k => (forall a. k a -> These (f a) (g a) -> h a) -> DMap k f -> DMap k g -> DMap k h
+alignWithKeyDMap f a b = DMap'.mapWithKey (\k t -> f k $ dtheseToThese t) $ DMap'.unionWithKey (\_ (DThis x) (DThat y) -> DThese x y) (DMap'.map DThis a) (DMap'.map DThat b)
 
 condenseV' :: forall k t g.
               ( Has View k, GCompare k, Foldable t, Filterable t, Functor t)
@@ -581,17 +678,17 @@ condenseV' :: forall k t g.
 condenseV' folded col =
   case findPivotD folded of
     NoneD -> emptyV
-    OneD (k :: k v) _ -> singletonV k (has @View k (condenseV $ mapMaybe (lookupV k) col))
-    SplitD pivot l r -> uncurry unionDistinctAscV $ (condenseV' l *** condenseV' r) $ splitV pivot col
+    OneD (k :: k v) _ -> has @View k $ singletonV k (condenseV $ mapMaybe (lookupV k) col)
+    SplitD pivot l r -> uncurry unionDistinctAscV $ (condenseV' l *** condenseV' r) $ has @View pivot $ splitV pivot col
 
 unionDistinctAscV :: (GCompare k) => Vessel k g -> Vessel k g -> Vessel k g
 unionDistinctAscV (Vessel l) (Vessel r) = Vessel $ DMap.unionWithKey (\_ x _ -> x) l r
 
-splitV :: forall k t g x. (GCompare k, Filterable t)
-       => k x -> t (Vessel k g) -> (t (Vessel k g), t (Vessel k g))
+splitV :: forall k t g v. (GCompare k, View v, Filterable t)
+       => k v -> t (Vessel k g) -> (t (Vessel k g), t (Vessel k g))
 splitV pivot col = unalignProperly $ mapMaybe (splitOneV pivot) col
 
-splitOneV :: (GCompare k) => k v -> Vessel k g -> Maybe (These (Vessel k g) (Vessel k g))
+splitOneV :: (GCompare k, View v) => k v -> Vessel k g -> Maybe (These (Vessel k g) (Vessel k g))
 splitOneV pivot m =
   let (l@(Vessel l'), r@(Vessel r')) = splitLTV pivot m
   in case (DMap.null l', DMap.null r') of
@@ -600,16 +697,16 @@ splitOneV pivot m =
     (True, False) -> Just $ That r
     (False, False) -> Just $ These l r
 
-splitLTV :: GCompare k => k v -> Vessel k g -> (Vessel k g, Vessel k g)
+splitLTV :: (GCompare k, View v) => k v -> Vessel k g -> (Vessel k g, Vessel k g)
 splitLTV k (Vessel m) = case DMap.splitLookup k m of
-  (l, Just v, r) -> (Vessel (DMap.insert k v l), Vessel r)
-  (l, Nothing, r) -> (Vessel l, Vessel r)
+  (l, Just (FlipAp v), r) | not $ nullV v -> (Vessel (DMap.insert k (FlipAp v) l), Vessel r)
+  (l, _, r) -> (Vessel l, Vessel r)
 
 mapDecomposedV
   :: (Functor m, View v)
   => (v Proxy -> m (v Identity))
   -> v (Compose (MonoidalMap c) g)
-  -> m (v (Compose (MonoidalMap c) Identity))
+  -> m (Maybe (v (Compose (MonoidalMap c) Identity)))
 mapDecomposedV f v = cropV recompose v <$> (f $ mapV (\_ -> Proxy) v)
   where
     recompose :: Compose (MonoidalMap c) g a -> Identity a -> Compose (MonoidalMap c) Identity a
