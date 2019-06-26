@@ -54,6 +54,7 @@ import Control.Arrow ((***))
 import Control.Monad
 import Data.Aeson
 import Data.Align
+import Data.Bifunctor
 import Data.Constraint.Extras
 import Data.Constraint.Forall
 import qualified Data.Dependent.Map as DMap'
@@ -360,7 +361,9 @@ instance (GCompare k) => View (DMapV k v) where
   traverseV f (DMapV m) = DMapV <$> DMap.traverseWithKey (\_ (Compose x) -> Compose <$> f x) m
   mapMaybeV f (DMapV (MonoidalDMap m)) = collapseNullV $ DMapV $ MonoidalDMap $
     DMap'.mapMaybe (fmap Compose . f . getCompose) m
---  alignWithMaybeV f (DMapV (MonoidalDMap a)) (DMapV (MonoidalDMap b)) = collapseNullV $ DMapV $ MonoidalDMap $ DMap'.mapMaybe _ $ DMap.alignWith f a b
+  alignWithV f (DMapV a) (DMapV b) = DMapV (alignWithKeyMonoidalDMap (\k x -> Compose . f $ bimap getCompose getCompose x) a b)
+  alignWithMaybeV f (DMapV a) (DMapV b) = collapseNullV . DMapV $
+     alignWithKeyMaybeMonoidalDMap (\k x -> fmap Compose $ f (bimap getCompose getCompose x)) a b
 
 instance (GCompare k) => EmptyView (DMapV k v) where
   emptyV = DMapV DMap.empty
@@ -566,6 +569,10 @@ instance (GCompare k) => View (MonoidalDMap k) where
   mapMaybeV f (MonoidalDMap m) = collapseNullV $ MonoidalDMap $
     DMap'.mapMaybe f m
 
+  alignWithV f a b = alignWithKeyMonoidalDMap (\k x -> f x) a b
+
+  alignWithMaybeV f a b = collapseNullV $ alignWithKeyMaybeMonoidalDMap (\k x -> f x) a b
+
 instance (GCompare k) => EmptyView (MonoidalDMap k) where
   emptyV = DMap.empty
 
@@ -663,6 +670,12 @@ dtheseToThese = \case
   DThis a -> This a
   DThat b -> That b
   DThese a b -> These a b
+
+theseToDThese :: These (f a) (g a) -> DThese f g a
+theseToDThese = \case
+  This a -> DThis a
+  That b -> DThat b
+  These a b -> DThese a b
 
 alignWithKeyMaybeDMap :: GCompare k => (forall a. k a -> These (f a) (g a) -> Maybe (h a)) -> DMap k f -> DMap k g -> DMap k h
 alignWithKeyMaybeDMap f a b = DMap'.mapMaybeWithKey (\k t -> f k $ dtheseToThese t) $ DMap'.unionWithKey (\_ (DThis x) (DThat y) -> DThese x y) (DMap'.map DThis a) (DMap'.map DThat b)
