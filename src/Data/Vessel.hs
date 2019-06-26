@@ -34,6 +34,7 @@ module Data.Vessel
   , singletonV
   , lookupV
   , buildV
+  , subtractV
   , mapMaybeWithKeyV
   , traverseWithKeyV
   , traverseWithKeyV_
@@ -47,7 +48,9 @@ module Data.Vessel
   , module Data.Proxy
   , module Data.Functor.Identity
   , module Data.Functor.Const
+  , module Data.Functor.Compose
   , transposeView
+  , Disperse(..)
   ) where
 
 import Control.Arrow ((***))
@@ -134,6 +137,9 @@ class View (v :: (* -> *) -> *) where
   -- | Map over all the leaves of two containers, combining the leaves with the
   -- provided function
   alignWithV :: (forall a. These (f a) (g a) -> h a) -> v f -> v g -> v h
+
+subtractV :: View v => v f -> v g -> Maybe (v f)
+subtractV = alignWithMaybeV (\case This x -> Just x; _ -> Nothing)
 
 -- | A type `v` supports EmptyView iff it is able to contain no information.
 class View v => EmptyView v where
