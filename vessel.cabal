@@ -25,6 +25,7 @@ library
                      , dependent-sum
                      , dependent-sum-aeson-orphans
                      , monoidal-containers
+                     , mtl
                      , reflex >= 0.6
                      , these
                      , QuickCheck

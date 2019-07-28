@@ -1,5 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -55,6 +56,7 @@ module Data.Vessel
 
 import Control.Arrow ((***))
 import Control.Monad
+import Control.Monad.Writer.Strict (Writer, execWriter, tell)
 import Data.Aeson
 import Data.Align
 import Data.Bifunctor
@@ -88,6 +90,7 @@ import Prelude hiding (lookup, map, null)
 import Reflex (Group(..), Additive, Query(..), QueryMorphism(..))
 import Data.AppendMap () -- For Group and Additive instances for MonoidalMap
 import Data.Maybe (fromMaybe)
+import GHC.Generics
 
 ------- The View Class -------
 
@@ -112,31 +115,67 @@ class View (v :: (* -> *) -> *) where
   -- many structures into a single one containing information about which keys each part of it
   -- came from originally.
   condenseV :: (Foldable t, Filterable t, Functor t) => t (v g) -> v (Compose t g)
+  default condenseV :: GCondenseView t g v => t (v g) -> v (Compose t g)
+  condenseV tvg = to $ condenseView $ from <$> tvg
+
   -- | Transpose a sufficiently-Map-like structure out of a container, the inverse of condenseV.
   disperseV :: (Align t) => v (Compose t g) -> t (v g)
+  default disperseV :: GDisperseView t g v => v (Compose t g) -> t (v g)
+  disperseV vtg = to <$> disperseView (from vtg)
+
   -- TODO: Decide whether mapV and traverseV are actually a good idea to provide.
   -- They may actually help people write operations which are inefficient.
+
   -- | Given a structure specifying a query, and a structure representing a view of data,
   -- restrict the view to only those parts which satisfy the query. (Essentially intersection of Maps.)
   cropV :: (forall a. s a -> i a -> r a) -> v s -> v i -> Maybe (v r)
+  default cropV :: forall s i r. GZipView s i r v => (forall a. s a -> i a -> r a) -> v s -> v i -> Maybe (v r)
+  cropV f vi vs = maybeEmptyView $ to $ zipView z (from vi) (from vs)
+    where z :: forall v'. (View v', EmptyView v') => v' s -> v' i -> v' r
+          z v'i v's = fromMaybe emptyV $ cropV f v'i v's
+
   -- | We also want a way to determine if the container is empty, because shipping empty containers
   -- around is a bad idea.
   nullV :: v i -> Bool
+  default nullV :: forall i. GMapView i i v => v i -> Bool
+  nullV v = getAll $ execWriter $
+              mapViewM @i @i @(Rep (v i)) @(Rep (v i)) f (from v)
+    where f :: View v' => v' i -> Writer All (v' i)
+          f v' = tell (All $ nullV v') *> pure v'
+
   -- | Map a natural transformation over all the leaves of a container, changing the functor which
   -- has been applied.
   mapV :: (forall a. f a -> g a) -> v f -> v g
+  default mapV :: GMapView f g v => (forall a. f a -> g a) -> v f -> v g
+  mapV f vf = to $ mapView (mapV f) $ from vf
+
   -- | Traverse over the leaves of a container.
   traverseV :: (Applicative m) => (forall a. f a -> m (g a)) -> v f -> m (v g)
+  default traverseV :: (GMapView f g v, Applicative m) => (forall a. f a -> m (g a)) -> v f -> m (v g)
+  traverseV f vf = to <$> mapViewM (traverseV f) (from vf)
+
   -- | Map over all the leaves of a container, keeping only the 'Just' results
   -- and returing 'Nothing' if no leaves are kept.
   mapMaybeV :: (forall a. f a -> Maybe (g a)) -> v f -> Maybe (v g)
+  default mapMaybeV :: forall f g. GMapView f g v => (forall a. f a -> Maybe (g a)) -> v f -> Maybe (v g)
+  mapMaybeV f vf = maybeEmptyView $ to $ mapView z $ from vf
+    where z :: forall v'. (View v', EmptyView v') => v' f -> v' g
+          z v'f = fromMaybe emptyV $ mapMaybeV f v'f
+
   -- | Map over all the leaves of two containers, combining the leaves with the
   -- provided function, keeping only the 'Just' results and returing 'Nothing'
   -- if no leaves are kept.
   alignWithMaybeV :: (forall a. These (f a) (g a) -> Maybe (h a)) -> v f -> v g -> Maybe (v h)
+  default alignWithMaybeV :: forall f g h. GZipView f g h v => (forall a. These (f a) (g a) -> Maybe (h a)) -> v f -> v g -> Maybe (v h)
+  alignWithMaybeV f vf vg = maybeEmptyView $ to $ zipView z (from vf) (from vg)
+    where z :: forall v'. (View v', EmptyView v') => v' f -> v' g -> v' h
+          z v'f v'g = fromMaybe emptyV $ alignWithMaybeV f v'f v'g
+
   -- | Map over all the leaves of two containers, combining the leaves with the
   -- provided function
   alignWithV :: (forall a. These (f a) (g a) -> h a) -> v f -> v g -> v h
+  default alignWithV :: GZipView f g h v => (forall a. These (f a) (g a) -> h a) -> v f -> v g -> v h
+  alignWithV f vf vg = to $ zipView (alignWithV f) (from vf) (from vg)
 
 subtractV :: View v => v f -> v g -> Maybe (v f)
 subtractV = alignWithMaybeV (\case This x -> Just x; _ -> Nothing)
@@ -779,3 +818,149 @@ unalignProperly f = (mapMaybe leftThese f, mapMaybe rightThese f)
 
 -- TODO: Class for fromDistinctAscList? In condenseV and disperseV, we might be able to improve the cost relative to
 -- combining many singleton maps, if we know those maps are presented to us in sorted order.
+
+maybeEmptyView :: View v => v f -> Maybe (v f)
+maybeEmptyView v = if nullV v then Nothing else Just v
+
+------ Classes and Generic instances for Generic View instance ------
+
+class Empty1 a where
+  empty :: a p
+
+instance Empty1 U1 where
+  empty = U1
+
+instance EmptyView v => Empty1 (K1 i (v f)) where
+  empty = K1 emptyV
+
+instance Empty1 a => Empty1 (M1 i t a) where
+  empty = M1 empty
+
+instance (Empty1 a, Empty1 b) => Empty1 (a :*: b) where
+  empty = empty :*: empty
+
+type GCondenseView t f v =
+  ( Generic (v f)
+  , Generic (v (Compose t f))
+  , CondenseView t (Rep (v f)) (Rep (v (Compose t f)))
+  )
+
+class (Foldable t, Filterable t, Functor t) => CondenseView t vf vtf where
+  condenseView :: t (vf p) -> vtf p
+
+instance (Foldable t, Filterable t, Functor t) => CondenseView t U1 U1 where
+  condenseView _ = U1
+
+instance (View v, Foldable t, Filterable t, Functor t) => CondenseView t (K1 i (v f)) (K1 i (v (Compose t f))) where
+  condenseView tvf = K1 $ condenseV $ unK1 <$> tvf
+
+instance CondenseView t vf vtf => CondenseView t (M1 i t' vf) (M1 i t' vtf) where
+  condenseView tvf = M1 $ condenseView $ unM1 <$> tvf
+
+instance (CondenseView t avf avtf, CondenseView t bvf bvtf, Empty1 avf, Empty1 bvf) => CondenseView t (avf :*: bvf) (avtf :*: bvtf) where
+  condenseView tvf = condenseView (getA <$> tvf) :*: condenseView (getB <$> tvf)
+    where getA (a :*: _) = a
+          getB (_ :*: b) = b
+
+type GDisperseView t f v =
+  ( Generic (v f)
+  , Generic (v (Compose t f))
+  , DisperseView t (Rep (v f)) (Rep (v (Compose t f)))
+  )
+
+class Align t => DisperseView t vf vtf where
+  disperseView :: vtf p -> t (vf p)
+
+instance Align t => DisperseView t U1 U1 where
+  disperseView _ = nil
+
+instance (View v, Align t) => DisperseView t (K1 i (v f)) (K1 i (v (Compose t f))) where
+  disperseView (K1 vtf) = K1 <$> disperseV vtf
+
+instance DisperseView t vf vtf => DisperseView t (M1 i t' vf) (M1 i t' vtf) where
+  disperseView (M1 vf) = M1 <$> disperseView vf
+
+instance (DisperseView t avf avtf, DisperseView t bvf bvtf, Empty1 avf, Empty1 bvf) => DisperseView t (avf :*: bvf) (avtf :*: bvtf) where
+  disperseView (avtf :*: bvtf) = alignWith f (disperseView avtf) (disperseView bvtf)
+    where f :: These (avf p) (bvf p) -> (avf :*: bvf) p
+          f = \case
+            This a -> a :*: empty
+            That b -> empty :*: b
+            These a b -> a :*: b
+
+type GMapView f g v =
+  ( Generic (v f)
+  , Generic (v g)
+  , MapView f g (Rep (v f)) (Rep (v g))
+  )
+
+class MapView f g vf vg where
+  mapViewM
+    :: Applicative m
+    => (forall v'. (View v', EmptyView v') => v' f -> m (v' g))
+    -> vf p
+    -> m (vg p)
+
+instance MapView f g V1 V1 where
+  mapViewM _ = \case
+
+instance MapView f g U1 U1 where
+  mapViewM _ U1 = pure U1
+
+instance (View v, EmptyView v) => MapView f g (K1 i (v f)) (K1 i (v g)) where
+  mapViewM f (K1 vf) = K1 <$> f vf
+
+instance MapView f g vf vg => MapView f g (M1 i t vf) (M1 i t vg) where
+  mapViewM f (M1 vf) = M1 <$> mapViewM f vf
+
+instance (MapView f g avf avg, MapView f g bvf bvg) => MapView f g (avf :*: bvf) (avg :*: bvg) where
+  mapViewM f (avf :*: bvf) = (:*:)
+    <$> mapViewM f avf
+    <*> mapViewM f bvf
+
+mapView
+  :: MapView f g vf vg
+  => (forall v'. (View v', EmptyView v') => v' f -> v' g)
+  -> vf p
+  -> vg p
+mapView f vf = runIdentity $ mapViewM (\v'f -> Identity $ f v'f) vf
+
+type GZipView f g h v =
+  ( Generic (v f)
+  , Generic (v g)
+  , Generic (v h)
+  , ZipView f g h (Rep (v f)) (Rep (v g)) (Rep (v h))
+  )
+
+class ZipView f g h vf vg vh where
+  zipViewM
+    :: Applicative m
+    => (forall v'. (View v', EmptyView v') => v' f -> v' g -> m (v' h))
+    -> vf p
+    -> vg p
+    -> m (vh p)
+
+instance ZipView f g h V1 V1 V1 where
+  zipViewM _ = \case
+
+instance ZipView f g h U1 U1 U1 where
+  zipViewM _ U1 U1 = pure U1
+
+instance (View v, EmptyView v) => ZipView f g h (K1 i (v f)) (K1 i (v g)) (K1 i (v h)) where
+  zipViewM f (K1 vf) (K1 vg) = K1 <$> f vf vg
+
+instance ZipView f g h vf vg vh => ZipView f g h (M1 i t vf) (M1 i t vg) (M1 i t vh) where
+  zipViewM f (M1 vf) (M1 vg) = M1 <$> zipViewM f vf vg
+
+instance (ZipView f g h avf avg avh, ZipView f g h bvf bvg bvh) => ZipView f g h (avf :*: bvf) (avg :*: bvg) (avh :*: bvh) where
+  zipViewM f (avf :*: bvf) (avg :*: bvg) = (:*:)
+    <$> zipViewM f avf avg
+    <*> zipViewM f bvf bvg
+
+zipView
+  :: ZipView f g h vf vg vh
+  => (forall v'. (View v', EmptyView v') => v' f -> v' g -> v' h)
+  -> vf p
+  -> vg p
+  -> vh p
+zipView f vf vg = runIdentity $ zipViewM (\v'f v'g -> Identity $ f v'f v'g) vf vg
