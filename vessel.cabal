@@ -13,7 +13,7 @@ cabal-version:       >=1.10
 category:            Data
 synopsis:            Functor-paramteric containers
 tested-with:
-  GHC  ==8.0.2 || ==8.2.2 || ==8.4.4 || ==8.6.5
+  GHC  ==8.2.2 || ==8.4.4 || ==8.6.5
 
 
 library
