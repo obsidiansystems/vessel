@@ -10,25 +10,35 @@ copyright:           Obsidian Systems LLC
 build-type:          Simple
 extra-source-files:  ChangeLog.md
 cabal-version:       >=1.10
+category:            Data
+synopsis:            Functor-paramteric containers
+tested-with:
+  GHC  ==8.2.2 || ==8.4.4 || ==8.6.5
+
 
 library
   exposed-modules:     Data.Vessel
   other-extensions:    FlexibleInstances, GeneralizedNewtypeDeriving, RankNTypes, ScopedTypeVariables, StandaloneDeriving, TypeFamilies, UndecidableInstances
-  build-depends:       base >=4.9 && <4.12
-                     , aeson
-                     , bifunctors
-                     , containers
-                     , constraints
-                     , constraints-extras
-                     , dependent-map
-                     , dependent-monoidal-map
-                     , dependent-sum
-                     , dependent-sum-aeson-orphans
-                     , monoidal-containers
-                     , mtl
-                     , reflex >= 0.6
-                     , these
-                     , QuickCheck
-                     , witherable >= 0.2
+  build-depends:       base >=4.9 && <4.13
+                     , aeson >= 1.4.4 && < 1.5
+                     , bifunctors >= 5.5 && < 5.6
+                     , containers >= 0.6 && < 0.7
+                     , constraints >= 0.10 && < 0.11
+                     , constraints-extras >= 0.3 && < 0.4
+                     , dependent-map >= 0.3 && < 0.4
+                     , dependent-monoidal-map >= 0.1.1.0 && < 0.2
+                     , dependent-sum >= 0.6 && < 0.7
+                     , dependent-sum-aeson-orphans >= 0.2.1 && < 0.3
+                     , monoidal-containers >= 0.6 && < 0.7
+                     , mtl >= 2.2 && < 2.3
+                     , reflex >= 0.6.2.4 && < 0.7
+                     , semialign >= 1
+                     , these >= 1.0.1 && < 1.1
+                     , QuickCheck >= 2.13 && < 2.14
+                     , witherable >= 0.2 && <= 0.3.2
   hs-source-dirs:      src
   default-language:    Haskell2010
+
+source-repository head
+  type: git
+  location: https://github.com/obsidiansystems/vessel
