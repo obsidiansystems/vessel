@@ -11,7 +11,7 @@ build-type:          Simple
 extra-source-files:  ChangeLog.md
 cabal-version:       >=1.10
 category:            Data
-synopsis:            Functor-paramteric containers
+synopsis:            Functor-parametric containers
 tested-with:
   GHC  ==8.2.2 || ==8.4.4 || ==8.6.5
 
