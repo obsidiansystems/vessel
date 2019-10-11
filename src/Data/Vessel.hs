@@ -48,6 +48,7 @@ module Data.Vessel
   , module Data.Functor.Identity
   , module Data.Functor.Const
   , transposeView
+  , Disperse(..)
   ) where
 
 import Control.Arrow ((***))
