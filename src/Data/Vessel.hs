@@ -48,6 +48,7 @@ module Data.Vessel
   , module Data.Functor.Identity
   , module Data.Functor.Const
   , transposeView
+  , singletonVQueryMorphism
   , Disperse(..)
   ) where
 
@@ -168,6 +169,20 @@ transposeView
 transposeView = QueryMorphism
   { _queryMorphism_mapQuery = condenseV -- aggregate queries.
   , _queryMorphism_mapQueryResult = disperseV -- individualise results.
+  }
+
+-- | Inject a view into a Vessel, as a QueryMorphism
+singletonVQueryMorphism
+  :: ( QueryResult (v g) ~ v g'
+     , QueryResult (Vessel k g) ~ Vessel k g'
+     , View v
+     , Monoid (v g')
+     , GCompare k
+     )
+  => k v -> QueryMorphism (v g) (Vessel k g)
+singletonVQueryMorphism k = QueryMorphism
+  { _queryMorphism_mapQuery = singletonV k
+  , _queryMorphism_mapQueryResult = fromMaybe mempty . lookupV k
   }
 
 ------- Vessel -------
