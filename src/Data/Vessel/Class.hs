@@ -20,8 +20,10 @@
 
 module Data.Vessel.Class where
 
+import Control.Arrow ((***))
 import Control.Monad.Writer.Strict (Writer, execWriter, tell)
 import Data.Align
+import Data.Foldable
 import Data.Functor.Compose
 import Data.Witherable
 import GHC.Generics
@@ -29,6 +31,15 @@ import Data.Semigroup
 import Data.These
 import Data.Maybe (fromMaybe)
 import Data.Functor.Identity
+import Reflex.Query.Class
+import Data.Proxy
+import Data.Map.Monoidal (MonoidalMap (..))
+import Data.Dependent.Map.Monoidal (MonoidalDMap (..))
+import Data.GADT.Compare
+import qualified Data.Dependent.Map.Monoidal as DMap
+import qualified Data.Dependent.Map as DMap'
+
+import Data.Vessel.Internal
 
 ------- The View Class -------
 
@@ -266,3 +277,90 @@ zipView
   -> vg p
   -> vh p
 zipView f vf vg = runIdentity $ zipViewM (\v'f v'g -> Identity $ f v'f v'g) vf vg
+
+collapseNullV :: View v => v f -> Maybe (v f)
+collapseNullV v = if nullV v
+  then Nothing
+  else Just v
+
+
+subtractV :: View v => v f -> v g -> Maybe (v f)
+subtractV = alignWithMaybeV (\case This x -> Just x; _ -> Nothing)
+
+alignWithMV
+  :: forall m v f g h
+  .  (View v, Applicative m)
+  => (forall a. These (f a) (g a) -> m (h a))
+  -> v f
+  -> v g
+  -> m (Maybe (v h))
+alignWithMV f a b = traverse (traverseV getCompose) $ alignWithMaybeV g a b
+  where g :: forall a. These (f a) (g a) -> Maybe (Compose m h a)
+        g = Just . Compose . f
+
+-- | A main point of the View class is to be able to produce this QueryMorphism.
+transposeView
+  :: ( View v
+     , Foldable t
+     , Filterable t
+     , Functor t
+     , Align t
+     , QueryResult (t (v g)) ~ (t (v g'))
+     , QueryResult (v (Compose t g)) ~ v (Compose t g')
+     , Monoid (v g)
+     , Monoid (v (Compose t g))
+     )
+  => QueryMorphism (t (v g)) (v (Compose t g))
+transposeView = QueryMorphism
+  { _queryMorphism_mapQuery = condenseV -- aggregate queries.
+  , _queryMorphism_mapQueryResult = disperseV -- individualise results.
+  }
+
+mapDecomposedV
+  :: (Functor m, View v)
+  => (v Proxy -> m (v Identity))
+  -> v (Compose (MonoidalMap c) g)
+  -> m (Maybe (v (Compose (MonoidalMap c) Identity)))
+mapDecomposedV f v = cropV recompose v <$> (f $ mapV (\_ -> Proxy) v)
+  where
+    recompose :: Compose (MonoidalMap c) g a -> Identity a -> Compose (MonoidalMap c) Identity a
+    recompose (Compose s) i = Compose $ i <$ s
+
+------- The View instance for MonoidalDMap -------
+instance (GCompare k) => View (MonoidalDMap k) where
+  cropV :: (forall a. s a -> i a -> r a) -> MonoidalDMap k s -> MonoidalDMap k i -> Maybe (MonoidalDMap k r)
+  cropV f a b = collapseNullV $ DMap.intersectionWithKey (\_ s i -> f s i) a b
+
+  nullV :: MonoidalDMap k s -> Bool
+  nullV m = DMap.null m
+
+  condenseV :: forall col g. ( Foldable col, Filterable col, Functor col )
+            => col (MonoidalDMap k g)
+            -> MonoidalDMap k (Compose col g)
+  condenseV col = condenseD' (fold (fmap unMonoidalDMap col)) col
+
+  disperseV :: forall col g. (Align col)
+           => MonoidalDMap k (Compose col g)
+           -> col (MonoidalDMap k g)
+  disperseV row = case findPivotD (unMonoidalDMap row) of
+    NoneD -> nil
+    OneD k (Compose v) -> fmap (DMap.singleton k) v
+    SplitD pivot _l _r -> uncurry (alignWith (mergeThese unionDistinctAscD)) $
+      disperseV *** disperseV $ splitLTD pivot row
+
+  mapV :: (forall a. f a -> g a) -> MonoidalDMap k f -> MonoidalDMap k g
+  mapV f m = DMap.map f m
+
+  traverseV :: (Applicative m) => (forall a. f a -> m (g a)) -> MonoidalDMap k f -> m (MonoidalDMap k g)
+  traverseV f m = DMap.traverseWithKey (\_ v -> f v) m
+
+  mapMaybeV f (MonoidalDMap m) = collapseNullV $ MonoidalDMap $
+    DMap'.mapMaybe f m
+
+  alignWithV f a b = alignWithKeyMonoidalDMap (\_ x -> f x) a b
+
+  alignWithMaybeV f a b = collapseNullV $ alignWithKeyMaybeMonoidalDMap (\_ x -> f x) a b
+
+instance (GCompare k) => EmptyView (MonoidalDMap k) where
+  emptyV = DMap.empty
+

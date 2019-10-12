@@ -1,5 +1,5 @@
 name:                vessel
-version:             0.1.0.0
+version:             0.1.1.0
 description:         A dependently-typed key-value data structure that allows for storage of both "queries", (wherein keys are stored along with reasons for selecting the items or counts of the number of times something has been selected), as well as the responses to those queries, in which the type of the key additionally determines the type of the response
 
 license:             BSD3
@@ -18,6 +18,16 @@ tested-with:
 
 library
   exposed-modules:     Data.Vessel
+                     , Data.Vessel.Map
+                     , Data.Vessel.Internal
+                     , Data.Vessel.Selectable
+                     , Data.Vessel.Class
+                     , Data.Vessel.Identity
+                     , Data.Vessel.Vessel
+                     , Data.Vessel.DependentMap
+                     , Data.Vessel.Single
+                     , Data.Vessel.Disperse
+
   other-extensions:    FlexibleInstances, GeneralizedNewtypeDeriving, RankNTypes, ScopedTypeVariables, StandaloneDeriving, TypeFamilies, UndecidableInstances
   build-depends:       base >=4.9 && <4.13
                      , aeson >= 1.4 && < 1.5
