@@ -25,6 +25,7 @@ library
                      , Data.Vessel.Identity
                      , Data.Vessel.Vessel
                      , Data.Vessel.DependentMap
+                     , Data.Vessel.SubVessel
                      , Data.Vessel.Single
                      , Data.Vessel.Disperse
 

@@ -30,6 +30,10 @@ module Data.Vessel
   , module Data.Functor.Compose
   , transposeView
   , Disperse(..)
+  , SubVessel(..)
+  , traverseSubVessel
+  , singletonSubVessel
+  , lookupSubVessel
   ) where
 
 import Data.Functor.Compose
@@ -46,6 +50,7 @@ import Data.Vessel.Identity as X
 import Data.Vessel.Internal as X
 import Data.Vessel.Map as X
 import Data.Vessel.Single as X
+import Data.Vessel.SubVessel as X
 
 
 --------------------------------------------------
