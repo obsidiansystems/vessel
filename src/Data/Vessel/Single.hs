@@ -26,12 +26,14 @@ import Data.Semigroup
 import Data.Functor.Identity
 import Data.Witherable
 import Data.Functor.Compose
+import Data.Functor.Const
 import Data.Align
 import Data.Aeson
 import GHC.Generics (Generic)
 
 import Data.Vessel.Class
 import Data.Vessel.Selectable
+import Data.Vessel.ViewMorphism
 
 ------- Simple structure components -------
 
@@ -79,4 +81,15 @@ instance Selectable (SingleV a) () where
   type Selection (SingleV a) () = Maybe a
   selector p () = SingleV p
   selection () (SingleV x) = getFirst . runIdentity $ x
+
+lookupSingleV :: SingleV a Identity -> Maybe a
+lookupSingleV = getFirst . runIdentity . unSingleV
+
+type instance ViewQueryResult (SingleV a (Const g)) = SingleV a Identity
+
+singleV :: ViewMorphism (Const g (Maybe a)) (SingleV a (Const g))
+singleV = ViewMorphism
+  { _viewMorphism_mapQuery = \(Const x) -> SingleV $ Const x
+  , _viewMorphism_mapQueryResult = \(SingleV (Identity (First x))) -> Just (Identity x)
+  }
 

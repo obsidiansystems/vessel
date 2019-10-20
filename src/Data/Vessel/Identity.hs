@@ -23,11 +23,13 @@ import Data.Aeson
 import Reflex.Patch (Group(..), Additive)
 import GHC.Generics
 import Data.Functor.Compose
+import Data.Functor.Const
 import Data.Functor.Identity
 import Data.These
 
 import Data.Vessel.Class
 import Data.Vessel.Selectable
+import Data.Vessel.ViewMorphism
 
 -- | A functor-indexed container corresponding to Identity. (i.e. a single non-deletable item)
 newtype IdentityV (a :: *) (g :: * -> *) = IdentityV { unIdentityV :: g a }
@@ -52,4 +54,15 @@ instance Selectable (IdentityV a) () where
   type Selection (IdentityV a) () = a
   selector p () = IdentityV p
   selection () (IdentityV (Identity a)) = a
+
+lookupIdentityV :: IdentityV a Identity -> a
+lookupIdentityV = runIdentity . unIdentityV
+
+type instance ViewQueryResult (IdentityV a (Const g)) = IdentityV a Identity
+
+identityV :: ViewMorphism (Const g a) (IdentityV a (Const g))
+identityV = ViewMorphism
+  { _viewMorphism_mapQuery = IdentityV
+  , _viewMorphism_mapQueryResult = Just . unIdentityV
+  }
 

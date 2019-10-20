@@ -33,7 +33,7 @@ import Data.Set (Set)
 import Data.Vessel.Class
 import Data.Vessel.Selectable
 import Data.Vessel.Disperse
--- import Data.Vessel.Internal
+import Data.Vessel.ViewMorphism
 
 -- | A functor-indexed container corresponding to Map k v.
 newtype MapV k v g = MapV { unMapV :: MonoidalMap k (g v) }
@@ -71,3 +71,17 @@ instance Ord k => Selectable (MapV k v) (Identity k) where
   selector p (Identity k) = MapV (Map.singleton k p)
   selection (Identity k) (MapV m) = Map.lookup k $ fmap (\(Identity a) -> a) m
 
+singletonMapV :: k -> g v -> MapV k v g
+singletonMapV k v = MapV $ Map.singleton k v
+
+lookupMapV :: Ord k => k -> MapV k v g -> Maybe (g v)
+lookupMapV k (MapV xs) = Map.lookup k xs
+
+type instance ViewQueryResult (MapV k v g) = MapV k v (ViewQueryResult g)
+mapVMorphism
+  :: ( Ord k , ViewQueryResult (g v) ~ ViewQueryResult g v)
+  => k -> ViewMorphism (g v) (MapV k v g)
+mapVMorphism k = ViewMorphism
+  { _viewMorphism_mapQuery = singletonMapV k
+  , _viewMorphism_mapQueryResult = lookupMapV k
+  }

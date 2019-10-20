@@ -28,6 +28,7 @@ library
                      , Data.Vessel.SubVessel
                      , Data.Vessel.Single
                      , Data.Vessel.Disperse
+                     , Data.Vessel.ViewMorphism
 
   other-extensions:    FlexibleInstances, GeneralizedNewtypeDeriving, RankNTypes, ScopedTypeVariables, StandaloneDeriving, TypeFamilies, UndecidableInstances
   build-depends:       base >=4.9 && <4.13

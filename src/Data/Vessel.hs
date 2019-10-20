@@ -51,6 +51,7 @@ import Data.Vessel.Internal as X
 import Data.Vessel.Map as X
 import Data.Vessel.Single as X
 import Data.Vessel.SubVessel as X
+import Data.Vessel.ViewMorphism as X
 
 
 --------------------------------------------------

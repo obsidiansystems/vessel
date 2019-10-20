@@ -50,6 +50,7 @@ import Data.These
 
 import Data.Vessel.Class
 import Data.Vessel.DependentMap
+import Data.Vessel.ViewMorphism
 
 ------- Vessel -------
 
@@ -231,3 +232,10 @@ splitLTV k (Vessel m) = case DMap.splitLookup k m of
   (l, Just (FlipAp v), r) | not $ nullV v -> (Vessel (DMap.insert k (FlipAp v) l), Vessel r)
   (l, _, r) -> (Vessel l, Vessel r)
 
+type instance ViewQueryResult (Vessel v g) = Vessel v (ViewQueryResult g)
+
+vessel :: (GCompare k, ViewQueryResult (v g) ~ v (ViewQueryResult g), View v) => k v -> ViewMorphism (v g) (Vessel k g)
+vessel k = ViewMorphism
+  { _viewMorphism_mapQuery = singletonV k
+  , _viewMorphism_mapQueryResult = lookupV k
+  }
