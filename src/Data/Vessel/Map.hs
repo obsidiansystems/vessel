@@ -84,4 +84,15 @@ mapVMorphism
 mapVMorphism k = ViewMorphism
   { _viewMorphism_mapQuery = singletonMapV k
   , _viewMorphism_mapQueryResult = lookupMapV k
+  , _viewMorphism_buildResult = singletonMapV k
   }
+
+-- | A gadget to "traverse" over all of the keys in a MapV in one step
+handleMapVSelector
+  :: forall a f g k m.
+  ( Ord k, Functor m )
+  => (forall x. x -> f x -> g x)
+  -> (Set k -> m (MonoidalMap k a))
+  ->    MapV k a f
+  -> m (MapV k a g)
+handleMapVSelector k f (MapV xs) = (\ys -> MapV $ Map.intersectionWith k ys xs) <$> f (Map.keysSet xs)

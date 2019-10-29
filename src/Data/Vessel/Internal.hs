@@ -204,13 +204,19 @@ splitOneD pivot m =
     (True, False) -> Just $ That r
     (False, False) -> Just $ These l r
 
-maybeToThese :: Maybe a -> Maybe b -> Maybe (These a b)
-maybeToThese = \case
-  Nothing -> fmap That
-  Just x -> \case
-    Nothing -> Just (This x)
-    Just y -> Just (These x y)
-
 instance Group (f (g x)) => Group (Compose f g x) where
   negateG (Compose fgx) = Compose (negateG fgx)
   Compose fgx ~~ Compose fgy = Compose (fgx ~~ fgy)
+
+curryMMap :: (Ord a, Ord b) => MonoidalMap (a,b) c -> MonoidalMap a (MonoidalMap b c)
+curryMMap m = Map.fromListWith (Map.unionWith (error "overlap")) $
+  [ (a, (Map.singleton b c))
+  | ((a,b), c) <- Map.toList m
+  ]
+
+uncurryMMap :: (Ord a, Ord b) => MonoidalMap a (MonoidalMap b c) -> MonoidalMap (a,b) c
+uncurryMMap m = Map.fromListWith (error "overlap") $
+  [ ((a, b), c)
+  | (a, bc) <- Map.toList m
+  , (b, c) <- Map.toList bc
+  ]

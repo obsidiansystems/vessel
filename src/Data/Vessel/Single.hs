@@ -91,5 +91,15 @@ singleV :: ViewMorphism (Const g (Maybe a)) (SingleV a (Const g))
 singleV = ViewMorphism
   { _viewMorphism_mapQuery = \(Const x) -> SingleV $ Const x
   , _viewMorphism_mapQueryResult = \(SingleV (Identity (First x))) -> Just (Identity x)
+  , _viewMorphism_buildResult = SingleV . fmap First
   }
+
+-- | A gadget to "traverse" over a SingleV
+handleSingleVSelector
+  :: forall a f g m. Functor m
+  => (forall x. x -> f x -> g x)
+  -> m (First (Maybe a))
+  ->    SingleV a f
+  -> m (SingleV a g)
+handleSingleVSelector k f (SingleV xs) = (\y -> SingleV $ k y xs) <$> f
 

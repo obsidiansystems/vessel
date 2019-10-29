@@ -64,5 +64,15 @@ identityV :: ViewMorphism (Const g a) (IdentityV a (Const g))
 identityV = ViewMorphism
   { _viewMorphism_mapQuery = IdentityV
   , _viewMorphism_mapQueryResult = Just . unIdentityV
+  , _viewMorphism_buildResult = IdentityV
   }
+
+-- | A gadget to "traverse" over an IdentityV
+handleIdentityVSelector
+  :: forall a f g m. Functor m
+  => (forall x. x -> f x -> g x)
+  -> m a
+  ->    IdentityV a f
+  -> m (IdentityV a g)
+handleIdentityVSelector k f (IdentityV xs) = (\y -> IdentityV $ k y xs) <$> f
 

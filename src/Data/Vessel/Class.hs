@@ -364,3 +364,9 @@ instance (GCompare k) => View (MonoidalDMap k) where
 instance (GCompare k) => EmptyView (MonoidalDMap k) where
   emptyV = DMap.empty
 
+filterV :: View v => (forall a. f a -> Bool) -> v f -> Maybe (v f)
+filterV f = mapMaybeV (\x -> if f x then Just x else Nothing)
+
+-- | a completely empty view.
+instance View Proxy
+

@@ -238,4 +238,5 @@ vessel :: (GCompare k, ViewQueryResult (v g) ~ v (ViewQueryResult g), View v) =>
 vessel k = ViewMorphism
   { _viewMorphism_mapQuery = singletonV k
   , _viewMorphism_mapQueryResult = lookupV k
+  , _viewMorphism_buildResult = singletonV k
   }
