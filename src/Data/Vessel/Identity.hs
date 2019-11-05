@@ -60,11 +60,18 @@ lookupIdentityV = runIdentity . unIdentityV
 
 type instance ViewQueryResult (IdentityV a (Const g)) = IdentityV a Identity
 
-identityV :: ViewMorphism (Const g a) (IdentityV a (Const g))
-identityV = ViewMorphism
-  { _viewMorphism_mapQuery = IdentityV
-  , _viewMorphism_mapQueryResult = Just . unIdentityV
-  , _viewMorphism_buildResult = IdentityV
+identityV :: (Applicative m, Applicative n) => ViewMorphism m n (Const g a) (IdentityV a (Const g))
+identityV = ViewMorphism toIdentityV fromIdentityV
+
+toIdentityV :: (Applicative m, Applicative n) => ViewHalfMorphism m n (Const g a) (IdentityV a (Const g))
+toIdentityV = ViewHalfMorphism
+  { _viewMorphism_mapQuery = pure . IdentityV
+  , _viewMorphism_mapQueryResult = pure . unIdentityV
+  }
+fromIdentityV :: (Applicative m, Applicative n) => ViewHalfMorphism m n (IdentityV a (Const g)) (Const g a)
+fromIdentityV = ViewHalfMorphism
+  { _viewMorphism_mapQuery = pure . unIdentityV
+  , _viewMorphism_mapQueryResult = pure . IdentityV
   }
 
 -- | A gadget to "traverse" over an IdentityV

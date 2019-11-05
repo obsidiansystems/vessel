@@ -38,7 +38,11 @@ import Data.Map.Monoidal (MonoidalMap (..))
 import qualified Data.Map.Monoidal as Map
 import Data.These
 import Reflex.Patch (Group(..), Additive)
+import Data.Coerce
+import Data.Set (Set)
 import Data.Witherable
+import qualified Data.Map as Map'
+import qualified Data.Map.Merge.Strict as Map'
 
 import qualified Data.Dependent.Map.Monoidal as DMap
 -- import qualified Data.Dependent.Map as DMap'
@@ -220,3 +224,18 @@ uncurryMMap m = Map.fromListWith (error "overlap") $
   | (a, bc) <- Map.toList m
   , (b, c) <- Map.toList bc
   ]
+
+leftOuterJoin :: Ord k => (a -> c) -> (a -> b -> c) -> MonoidalMap k a -> MonoidalMap k b -> MonoidalMap k c
+leftOuterJoin =
+  (coerce :: ((a -> c) -> (a -> b -> c) -> Map'.Map k a -> Map'.Map k b -> Map'.Map k c)
+          -> ((a -> c) -> (a -> b -> c) -> MonoidalMap k a -> MonoidalMap k b -> MonoidalMap k c)
+  ) leftOuterJoin'
+
+leftOuterJoin' :: Ord k => (a -> c) -> (a -> b -> c) -> Map'.Map k a -> Map'.Map k b -> Map'.Map k c
+leftOuterJoin' a2c ab2c = Map'.merge
+    (Map'.mapMissing $ \_ -> a2c)
+    Map'.dropMissing
+    (Map'.zipWithMatched $ \_ -> ab2c)
+
+leftOuterJoin_ :: Ord k => a -> Set k -> MonoidalMap k a -> MonoidalMap k a
+leftOuterJoin_ x = leftOuterJoin id const . Map.fromSet (const x)

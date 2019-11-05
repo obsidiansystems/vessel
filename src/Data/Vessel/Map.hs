@@ -19,8 +19,10 @@
 
 module Data.Vessel.Map where
 
+import Control.Applicative
 import Data.Aeson
 import Data.Align
+import Data.Foldable
 import Data.Functor.Identity
 import Data.Functor.Compose
 import Data.Map.Monoidal (MonoidalMap (..))
@@ -30,7 +32,7 @@ import qualified Data.Map.Monoidal as Map
 import qualified Data.Map as Map'
 import Data.Set (Set)
 
-import Data.Vessel.Class
+import Data.Vessel.Class hiding (empty)
 import Data.Vessel.Selectable
 import Data.Vessel.Disperse
 import Data.Vessel.ViewMorphism
@@ -78,13 +80,67 @@ lookupMapV :: Ord k => k -> MapV k v g -> Maybe (g v)
 lookupMapV k (MapV xs) = Map.lookup k xs
 
 type instance ViewQueryResult (MapV k v g) = MapV k v (ViewQueryResult g)
+
 mapVMorphism
-  :: ( Ord k , ViewQueryResult (g v) ~ ViewQueryResult g v)
-  => k -> ViewMorphism (g v) (MapV k v g)
-mapVMorphism k = ViewMorphism
-  { _viewMorphism_mapQuery = singletonMapV k
-  , _viewMorphism_mapQueryResult = lookupMapV k
-  , _viewMorphism_buildResult = singletonMapV k
+  :: ( Ord k , ViewQueryResult (g v) ~ ViewQueryResult g v, Alternative n, Applicative m)
+  => k -> ViewMorphism m n (g v) (MapV k v g)
+mapVMorphism k = ViewMorphism (toMapVMorphism k) (fromMapVMorphism k)
+
+toMapVMorphism
+  :: ( Ord k , ViewQueryResult (g v) ~ ViewQueryResult g v, Alternative n, Applicative m)
+  => k -> ViewHalfMorphism m n (g v) (MapV k v g)
+toMapVMorphism k = ViewHalfMorphism
+  { _viewMorphism_mapQuery = pure . singletonMapV k
+  , _viewMorphism_mapQueryResult = maybe empty pure . lookupMapV k
+  }
+fromMapVMorphism
+  :: ( Alternative m, Applicative n, Ord k , ViewQueryResult (g v) ~ ViewQueryResult g v)
+  => k -> ViewHalfMorphism m n (MapV k v g) (g v)
+fromMapVMorphism k = ViewHalfMorphism
+  { _viewMorphism_mapQuery = maybe empty pure . lookupMapV k
+  , _viewMorphism_mapQueryResult = pure . singletonMapV k
+  }
+
+mapVSetMorphism
+  :: ( Ord k , ViewQueryResult (g v) ~ ViewQueryResult g v, Monoid (ViewQueryResult g v), Monoid (g v), Alternative n, Applicative m)
+  => Set k -> ViewMorphism m n (g v) (MapV k v g)
+mapVSetMorphism k = ViewMorphism (toMapVSetMorphism k) (fromMapVSetMorphism k)
+
+toMapVSetMorphism
+  :: ( Ord k , ViewQueryResult (g v) ~ ViewQueryResult g v, Applicative n, Applicative m, Monoid (ViewQueryResult g v))
+  => Set k -> ViewHalfMorphism m n (g v) (MapV k v g)
+toMapVSetMorphism k = ViewHalfMorphism
+  { _viewMorphism_mapQuery = pure . MapV . flip Map.fromSet k . const
+  , _viewMorphism_mapQueryResult = pure . fold . flip Map'.restrictKeys k . getMonoidalMap . unMapV
+  }
+fromMapVSetMorphism
+  :: ( Alternative m, Applicative n, Ord k , ViewQueryResult (g v) ~ ViewQueryResult g v, Monoid (g v))
+  => Set k -> ViewHalfMorphism m n (MapV k v g) (g v)
+fromMapVSetMorphism k = ViewHalfMorphism
+  { _viewMorphism_mapQuery = pure . fold . flip Map'.restrictKeys k . getMonoidalMap . unMapV
+  , _viewMorphism_mapQueryResult = pure . MapV . flip Map.fromSet k . const
+  }
+
+-- | Match whatever's present in the View, insert nothing.
+mapVWildcardMorphism
+  :: (Semigroup (g v), Semigroup (ViewQueryResult g v), ViewQueryResult (g v) ~ ViewQueryResult g v, Alternative n, Applicative m)
+  => ViewMorphism m n (g v) (MapV k v g)
+mapVWildcardMorphism = ViewMorphism toMapVWildcardMorphism fromMapVWildcardMorphism
+
+toMapVWildcardMorphism
+  :: (Applicative m, Alternative n, Semigroup (ViewQueryResult g v), ViewQueryResult (g v) ~ ViewQueryResult g v)
+  => ViewHalfMorphism m n (g v) (MapV k v g)
+toMapVWildcardMorphism = ViewHalfMorphism
+  { _viewMorphism_mapQuery = const $ pure $ MapV Map.empty
+  , _viewMorphism_mapQueryResult = maybe empty pure . foldMap Just . unMapV
+  }
+
+fromMapVWildcardMorphism
+  :: (Alternative m, Applicative n, Semigroup (g v))
+  => ViewHalfMorphism m n (MapV k v g) (g v)
+fromMapVWildcardMorphism = ViewHalfMorphism
+  { _viewMorphism_mapQuery = maybe empty pure . foldMap Just . unMapV
+  , _viewMorphism_mapQueryResult = const $ pure $ MapV Map.empty
   }
 
 -- | A gadget to "traverse" over all of the keys in a MapV in one step
@@ -96,3 +152,7 @@ handleMapVSelector
   ->    MapV k a f
   -> m (MapV k a g)
 handleMapVSelector k f (MapV xs) = (\ys -> MapV $ Map.intersectionWith k ys xs) <$> f (Map.keysSet xs)
+
+-- | Non-existentialized mapV; since the contained value is known
+mapMapWithKeyV :: (k -> f a -> g a) -> MapV k a f -> MapV k a g
+mapMapWithKeyV f (MapV xs) = MapV (Map.mapWithKey f xs)

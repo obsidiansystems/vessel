@@ -1,3 +1,5 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -32,6 +34,7 @@ import Data.These
 import Reflex.Query.Class
 import Reflex.Class
 import Data.Align
+import Data.Vessel.Internal ()
 
 type family ViewQueryResult (v :: k) :: k
 
@@ -40,39 +43,80 @@ type instance ViewQueryResult (Const g) = Identity
 type instance ViewQueryResult (a, b) = These (ViewQueryResult a) (ViewQueryResult b)
 
 -- a way to request partially loaded information;
-data ViewMorphism p q = ViewMorphism
-  { _viewMorphism_mapQuery :: p -> q
-  , _viewMorphism_mapQueryResult :: ViewQueryResult q -> Maybe (ViewQueryResult p) -- TODO Loading data
-  , _viewMorphism_buildResult :: ViewQueryResult p -> ViewQueryResult q
+data ViewHalfMorphism m n p q = ViewHalfMorphism
+  { _viewMorphism_mapQuery :: p -> m q
+  , _viewMorphism_mapQueryResult :: ViewQueryResult q -> n (ViewQueryResult p) -- TODO Loading data
   }
 
-instance Category ViewMorphism where
-  id = ViewMorphism id Just id
-  ViewMorphism f f' f'' . ViewMorphism g g' g'' = ViewMorphism (f . g) (f' >=> g') (f'' . g'')
+data ViewMorphism m n p q = ViewMorphism
+  { _viewMorphism_to ::   ViewHalfMorphism m n p q
+  , _viewMorphism_from :: ViewHalfMorphism n m q p
+  }
 
-instance (Semigroup b, Semigroup (ViewQueryResult b)) => Semigroup (ViewMorphism a b) where
-  ViewMorphism f f' f'' <> ViewMorphism g g' g'' = ViewMorphism (f <> g) (\x -> f' x <|> g' x) (f'' <> g'')
+type ViewMorphismSimple = ViewMorphism Identity Maybe
 
-instance (Monoid b, Monoid (ViewQueryResult b))  => Monoid (ViewMorphism a b) where
+instance (Monad m, Monad n) => Category (ViewHalfMorphism n m) where
+  id = ViewHalfMorphism pure pure
+  ViewHalfMorphism f f' . ViewHalfMorphism g g' = ViewHalfMorphism (f <=< g) (f' >=> g')
+
+instance (Monad m, Monad n) => Category (ViewMorphism m n) where
+  id = ViewMorphism id id
+  ViewMorphism f f' . ViewMorphism g g' = ViewMorphism (f . g) (g' . f')
+
+instance (Semigroup (m b) , Semigroup (n (ViewQueryResult a))) => Semigroup (ViewHalfMorphism m n a b) where
+  ViewHalfMorphism f f' <> ViewHalfMorphism g g' = ViewHalfMorphism (f <> g) (f' <> g')
+
+instance (Monoid (m b) , Monoid (n (ViewQueryResult a))) => Monoid (ViewHalfMorphism m n a b) where
   mappend = (<>)
-  mempty = ViewMorphism (const mempty) (const Nothing) (const mempty)
+  mempty = ViewHalfMorphism mempty mempty
+
+instance
+    ( Semigroup (m b), Semigroup (m (ViewQueryResult b))
+    , Semigroup (n a), Semigroup (n (ViewQueryResult a))
+    ) => Semigroup (ViewMorphism m n a b) where
+  ViewMorphism f f' <> ViewMorphism g g' = ViewMorphism (f <> g) (f' <> g')
+
+instance
+    ( Monoid (m b), Monoid (m (ViewQueryResult b))
+    , Monoid (n a), Monoid (n (ViewQueryResult a))
+    )  => Monoid (ViewMorphism m n a b) where
+  mappend = (<>)
+  mempty = ViewMorphism mempty mempty
 
 -- | query for two things simultaneously, return as much result as is available.
-zipViewMorphism :: (Semigroup c, Semigroup (ViewQueryResult c))  => ViewMorphism a c -> ViewMorphism b c -> ViewMorphism (a, b) c
-zipViewMorphism (ViewMorphism f f' f'') (ViewMorphism g g' g'') = ViewMorphism
-  { _viewMorphism_mapQuery = \(x, y) -> f x <> g y
-  , _viewMorphism_mapQueryResult = \r -> align (f' r) (g' r)
-  , _viewMorphism_buildResult = these id id (<>) . bimap f'' g''
-  }
+zipViewMorphism
+  ::
+  ( Semigroup (m c)
+  , Semigroup (m (ViewQueryResult c))
+  , Semialign n
+  , Applicative n
+  )
+  => ViewMorphism m n a c -> ViewMorphism m n b c -> ViewMorphism m n (a, b) c
+zipViewMorphism (ViewMorphism f f') (ViewMorphism g g') = ViewMorphism (toZipViewMorphism f g) (fromZipViewMorphism f' g')
 
-queryViewMorphism :: forall t (p :: *) (q :: *) m.
+toZipViewMorphism :: forall m n a b c. (Semialign n, Semigroup (m c)) => ViewHalfMorphism m n a c -> ViewHalfMorphism m n b c -> ViewHalfMorphism m n (a, b) c
+toZipViewMorphism (ViewHalfMorphism a2c c2a' ) (ViewHalfMorphism b2c c2b' ) = ViewHalfMorphism
+    { _viewMorphism_mapQuery = \(x, y) -> a2c x <> b2c y
+    , _viewMorphism_mapQueryResult = \r -> align (c2a' r) (c2b' r)
+    }
+fromZipViewMorphism
+  :: forall m n a b c.
+  ( Applicative m
+  , Semigroup (n (ViewQueryResult c))
+  ) => ViewHalfMorphism m n c a -> ViewHalfMorphism m n c b -> ViewHalfMorphism m n c (a, b)
+fromZipViewMorphism (ViewHalfMorphism c2a a2c') (ViewHalfMorphism c2b b2c') = ViewHalfMorphism
+    { _viewMorphism_mapQuery = \r -> liftA2 (,) (c2a r) (c2b r)
+    , _viewMorphism_mapQueryResult = these id id ((<>)) . bimap a2c' b2c'
+    }
+
+queryViewMorphism :: forall t (p :: *) (q :: *) m partial.
   ( Reflex t
   , MonadQuery t q m
   , Monad m
   , QueryResult q ~ ViewQueryResult q
   )
-  => p -> Dynamic t (ViewMorphism p q) -> m (Dynamic t (Maybe (ViewQueryResult p)))
+  => p -> Dynamic t (ViewMorphism Identity partial p q) -> m (Dynamic t (partial (ViewQueryResult p)))
 queryViewMorphism x q = do
-  v :: Dynamic t (QueryResult q) <- queryDyn $ (\(ViewMorphism f _ _) -> f x) <$> q
-  return $ (\v' (ViewMorphism _ g _) -> g v') <$> v <*> q
+  v :: Dynamic t (QueryResult q) <- queryDyn $ (\(ViewMorphism (ViewHalfMorphism f _) _) -> runIdentity $ f x) <$> q
+  return $ (\v' (ViewMorphism  (ViewHalfMorphism _ g) _) -> g v') <$> v <*> q
 

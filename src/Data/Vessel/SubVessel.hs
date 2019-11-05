@@ -20,6 +20,7 @@
 
 module Data.Vessel.SubVessel where
 
+import Control.Applicative
 import Data.Aeson
 import Data.Constraint
 import Data.Constraint.Extras
@@ -27,7 +28,6 @@ import Data.Dependent.Map.Monoidal (MonoidalDMap(..))
 import Data.Dependent.Sum (DSum(..))
 import Data.Foldable
 import Data.Functor.Compose
-import Data.Functor.Const
 import Data.Functor.Identity
 import Data.GADT.Compare
 import Data.GADT.Show
@@ -39,9 +39,10 @@ import GHC.Generics
 import Reflex.Patch (Group(..), Additive)
 import Reflex.Query.Class
 import qualified Data.Dependent.Map as DMap'
+import qualified Data.Dependent.Map.Monoidal as DMap
 import qualified Data.Map.Monoidal as Map
 
-import Data.Vessel.Class
+import Data.Vessel.Class hiding (empty)
 import Data.Vessel.Vessel
 import Data.Vessel.Internal
 import Data.Vessel.ViewMorphism
@@ -122,12 +123,82 @@ subVesselFromKeys f ks = SubVessel $ fromListV $ fmap (\k -> SubVesselKey k :~> 
 
 type instance ViewQueryResult (SubVessel k v g) = SubVessel k v (ViewQueryResult g)
 
-subVessel :: (Ord k, View v, ViewQueryResult (v g) ~ v (ViewQueryResult g)) => k -> ViewMorphism (v g) (SubVessel k v g)
-subVessel k = ViewMorphism
-  { _viewMorphism_mapQuery = singletonSubVessel k
-  , _viewMorphism_mapQueryResult = lookupSubVessel k
-  , _viewMorphism_buildResult = singletonSubVessel k
+subVessel :: (Ord k, View v, ViewQueryResult (v g) ~ v (ViewQueryResult g), Alternative n, Applicative m) => k -> ViewMorphism m n (v g) (SubVessel k v g)
+subVessel k = ViewMorphism (toSubVessel k) (fromSubVessel k)
+
+toSubVessel :: (Ord k, Applicative m, Alternative n, View v, ViewQueryResult (v g) ~ v (ViewQueryResult g)) => k -> ViewHalfMorphism m n (v g) (SubVessel k v g)
+toSubVessel k = ViewHalfMorphism
+  { _viewMorphism_mapQuery = pure . singletonSubVessel k
+  , _viewMorphism_mapQueryResult = maybe empty pure . lookupSubVessel k
   }
+
+fromSubVessel :: (Ord k, Alternative m, Applicative n, View v, ViewQueryResult (v g) ~ v (ViewQueryResult g)) => k -> ViewHalfMorphism m n (SubVessel k v g) (v g)
+fromSubVessel k = ViewHalfMorphism
+  { _viewMorphism_mapQuery = maybe empty pure . lookupSubVessel k
+  , _viewMorphism_mapQueryResult = pure . singletonSubVessel k
+  }
+
+
+subVesselWildcard
+  ::
+  ( Ord k
+  , View v, ViewQueryResult (v g) ~ v (ViewQueryResult g)
+  , Semigroup (v g), Semigroup (v (ViewQueryResult g))
+  , Alternative n
+  , Applicative m
+  ) => ViewMorphism m n (v g) (SubVessel k v g)
+subVesselWildcard = ViewMorphism toSubVesselWildcard fromSubVesselWildcard
+
+toSubVesselWildcard
+  ::
+  ( Ord k
+  , Applicative m, Alternative n
+  , View v, ViewQueryResult (v g) ~ v (ViewQueryResult g)
+  , Semigroup (v (ViewQueryResult g))
+  ) => ViewHalfMorphism m n (v g) (SubVessel k v g)
+toSubVesselWildcard = ViewHalfMorphism
+  { _viewMorphism_mapQuery = const $ pure $ SubVessel $ Vessel $ DMap.empty
+  , _viewMorphism_mapQueryResult = maybe empty pure . foldMap Just . getSubVessel
+  }
+
+fromSubVesselWildcard
+  ::
+  ( Ord k
+  , Alternative m, Applicative n
+  , Semigroup (v g)
+  ) => ViewHalfMorphism m n (SubVessel k v g) (v g)
+fromSubVesselWildcard = ViewHalfMorphism
+  { _viewMorphism_mapQuery = maybe empty pure . foldMap Just . getSubVessel
+  , _viewMorphism_mapQueryResult = const $ pure $ SubVessel $ Vessel $ DMap.empty
+  }
+
+subVessels ::
+  ( Ord k, Applicative m, View v , Alternative n
+  , ViewQueryResult (v g) ~ v (ViewQueryResult g)
+  , Monoid (n (v g)) , Monoid (n (v (ViewQueryResult g)))
+  ) => Set k -> ViewMorphism m n (v g) (SubVessel k v g)
+subVessels k = ViewMorphism (toSubVessels k) (fromSubVessels k)
+
+toSubVessels ::
+  ( Ord k, Applicative m, View v , Alternative n
+  , ViewQueryResult (v g) ~ v (ViewQueryResult g)
+  , Monoid (n (v (ViewQueryResult g)))
+  ) => Set k -> ViewHalfMorphism m n (v g) (SubVessel k v g)
+toSubVessels k = ViewHalfMorphism
+  { _viewMorphism_mapQuery = pure . flip subVesselFromKeys k . const
+  , _viewMorphism_mapQueryResult = fold . leftOuterJoin_ empty k . fmap pure . getSubVessel
+  }
+
+fromSubVessels ::
+  ( Ord k, Applicative m, View v , Alternative n
+  , ViewQueryResult (v g) ~ v (ViewQueryResult g)
+  , Monoid (n (v g))
+  ) => Set k -> ViewHalfMorphism n m (SubVessel k v g) (v g)
+fromSubVessels k = ViewHalfMorphism
+  { _viewMorphism_mapQuery = fold . leftOuterJoin_ empty k . fmap pure . getSubVessel
+  , _viewMorphism_mapQueryResult = pure . flip subVesselFromKeys k . const
+  }
+
 
 mapMaybeWithKeySubVessel :: forall k v (g :: * -> *) (g' :: * -> *) . (View v, Ord k) => (k -> v g -> Maybe (v g')) -> SubVessel k v g -> SubVessel k v g'
 mapMaybeWithKeySubVessel f (SubVessel xs) = SubVessel (mapMaybeWithKeyV @(SubVesselKey k v) f' xs)
@@ -169,4 +240,7 @@ handleSubSubVesselSelector
   ->    MonoidalMap k1 (SubVessel k2 (Vessel tag) f)
   -> m (MonoidalMap k1 (SubVessel k2 (Vessel tag) g))
 handleSubSubVesselSelector f xs = currySubVessel <$> handleSubVesselSelector f (uncurrySubVessel xs)
+
+instance (Ord k, View v) => EmptyView (SubVessel k v) where
+  emptyV = SubVessel emptyV
 

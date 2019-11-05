@@ -87,13 +87,22 @@ lookupSingleV = getFirst . runIdentity . unSingleV
 
 type instance ViewQueryResult (SingleV a (Const g)) = SingleV a Identity
 
-singleV :: ViewMorphism (Const g (Maybe a)) (SingleV a (Const g))
-singleV = ViewMorphism
-  { _viewMorphism_mapQuery = \(Const x) -> SingleV $ Const x
-  , _viewMorphism_mapQueryResult = \(SingleV (Identity (First x))) -> Just (Identity x)
-  , _viewMorphism_buildResult = SingleV . fmap First
+-- Note.  the result functions always return Just;  a "Single" is always
+-- present in the result, only that the value it may be is possibly a Nothing.
+singleV :: (Applicative m, Applicative n) => ViewMorphism m n (Const g (Maybe a)) (SingleV a (Const g))
+singleV = ViewMorphism toSingleV fromSingleV
+
+toSingleV :: (Applicative m, Applicative n) => ViewHalfMorphism m n (Const g (Maybe a)) (SingleV a (Const g))
+toSingleV = ViewHalfMorphism
+  { _viewMorphism_mapQuery = \(Const x) -> pure . SingleV $ Const x
+  , _viewMorphism_mapQueryResult = \(SingleV (Identity (First x))) -> pure (Identity x)
   }
 
+fromSingleV :: (Applicative m, Applicative n) => ViewHalfMorphism m n (SingleV a (Const g)) (Const g (Maybe a))
+fromSingleV = ViewHalfMorphism
+  { _viewMorphism_mapQuery = \(SingleV (Const g)) -> pure $ Const g
+  , _viewMorphism_mapQueryResult = pure . SingleV . fmap First
+  }
 -- | A gadget to "traverse" over a SingleV
 handleSingleVSelector
   :: forall a f g m. Functor m
@@ -103,3 +112,6 @@ handleSingleVSelector
   -> m (SingleV a g)
 handleSingleVSelector k f (SingleV xs) = (\y -> SingleV $ k y xs) <$> f
 
+-- | Non-existentialized mapV; since the contained value is known
+mapSingleV :: (f (First (Maybe a)) -> g (First (Maybe a))) -> SingleV a f -> SingleV a g
+mapSingleV f (SingleV xs) = SingleV (f xs)

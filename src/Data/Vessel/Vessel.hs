@@ -20,13 +20,13 @@
 
 module Data.Vessel.Vessel where
 
+import Control.Applicative
 import Control.Arrow ((***))
 import Control.Monad
 import Data.Aeson
 import Data.Some (Some)
 import Data.Constraint.Extras
 import Data.Functor.Identity
-import Data.Functor.Const
 import Data.Proxy
 import Data.Dependent.Sum
 import Data.Dependent.Sum.Orphans ()
@@ -48,7 +48,7 @@ import qualified Data.Dependent.Map as DMap'
 import Data.Maybe (fromMaybe)
 import Data.These
 
-import Data.Vessel.Class
+import Data.Vessel.Class hiding (empty)
 import Data.Vessel.DependentMap
 import Data.Vessel.ViewMorphism
 
@@ -234,9 +234,17 @@ splitLTV k (Vessel m) = case DMap.splitLookup k m of
 
 type instance ViewQueryResult (Vessel v g) = Vessel v (ViewQueryResult g)
 
-vessel :: (GCompare k, ViewQueryResult (v g) ~ v (ViewQueryResult g), View v) => k v -> ViewMorphism (v g) (Vessel k g)
-vessel k = ViewMorphism
-  { _viewMorphism_mapQuery = singletonV k
-  , _viewMorphism_mapQueryResult = lookupV k
-  , _viewMorphism_buildResult = singletonV k
+vessel :: (GCompare k, ViewQueryResult (v g) ~ v (ViewQueryResult g), View v, Alternative n, Applicative m) => k v -> ViewMorphism m n (v g) (Vessel k g)
+vessel k = ViewMorphism (toVessel k) (fromVessel k)
+
+toVessel :: (Applicative m, Alternative n, GCompare k, ViewQueryResult (v g) ~ v (ViewQueryResult g), View v) => k v -> ViewHalfMorphism m n (v g) (Vessel k g)
+toVessel k = ViewHalfMorphism
+  { _viewMorphism_mapQuery = pure . singletonV k
+  , _viewMorphism_mapQueryResult = maybe empty pure . lookupV k
+  }
+
+fromVessel:: (Alternative m, Applicative n, GCompare k, ViewQueryResult (v g) ~ v (ViewQueryResult g), View v) => k v -> ViewHalfMorphism m n (Vessel k g) (v g)
+fromVessel k = ViewHalfMorphism
+  { _viewMorphism_mapQuery = maybe empty pure . lookupV k
+  , _viewMorphism_mapQueryResult = pure . singletonV k
   }
