@@ -83,3 +83,8 @@ handleIdentityVSelector
   -> m (IdentityV a g)
 handleIdentityVSelector k f (IdentityV xs) = (\y -> IdentityV $ k y xs) <$> f
 
+-- | Non-existentialized map; since the contained value is known
+mapIdentityV :: (f a -> g a) -> IdentityV a f -> IdentityV a g
+mapIdentityV f (IdentityV xs) = IdentityV (f xs)
+
+
