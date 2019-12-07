@@ -248,3 +248,6 @@ fromVessel k = ViewHalfMorphism
   { _viewMorphism_mapQuery = maybe empty pure . lookupV k
   , _viewMorphism_mapQueryResult = pure . singletonV k
   }
+
+filterNullFlipAps :: (GCompare k, Has View k) => MonoidalDMap k (FlipAp f) -> MonoidalDMap k (FlipAp f)
+filterNullFlipAps = DMap.mapMaybeWithKey (\k (FlipAp v) -> has @View k $ FlipAp <$> collapseNullV v)

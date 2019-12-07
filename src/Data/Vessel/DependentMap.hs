@@ -76,9 +76,6 @@ instance (GCompare k) => View (DMapV k v) where
 instance (GCompare k) => EmptyView (DMapV k v) where
   emptyV = DMapV DMap.empty
 
-filterNullFlipAps :: (GCompare k, Has View k) => MonoidalDMap k (FlipAp f) -> MonoidalDMap k (FlipAp f)
-filterNullFlipAps = DMap.mapMaybeWithKey (\k (FlipAp v) -> has @View k $ FlipAp <$> collapseNullV v)
-
 instance (GCompare k) => Selectable (DMapV k v) (Set (Some k)) where
   type Selection (DMapV k v) (Set (Some k)) = MonoidalDMap k v
   selector p s = DMapV . DMap.fromListWithKey (\_ x _ -> x) $
