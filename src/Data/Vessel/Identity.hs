@@ -33,7 +33,7 @@ import Data.Vessel.ViewMorphism
 
 -- | A functor-indexed container corresponding to Identity. (i.e. a single non-deletable item)
 newtype IdentityV (a :: *) (g :: * -> *) = IdentityV { unIdentityV :: g a }
-  deriving (Eq, Ord, Show, Read, Semigroup, Monoid, Group, Additive, Generic)
+  deriving (Eq, Ord, Show, Read, Semigroup, Monoid, Group, Additive, Generic, ToJSON, FromJSON)
 
 instance View (IdentityV a) where
   cropV f (IdentityV s) (IdentityV x) = Just $ IdentityV $ f s x
@@ -45,10 +45,6 @@ instance View (IdentityV a) where
   mapMaybeV f (IdentityV x) = IdentityV <$> f x
   alignWithMaybeV f (IdentityV x) (IdentityV y) = IdentityV <$> f (These x y)
   alignWithV f (IdentityV x) (IdentityV y) = IdentityV $ f $ These x y
-
-instance ToJSON (g a) => ToJSON (IdentityV a g)
-
-instance FromJSON (g a) => FromJSON (IdentityV a g)
 
 instance Selectable (IdentityV a) () where
   type Selection (IdentityV a) () = a

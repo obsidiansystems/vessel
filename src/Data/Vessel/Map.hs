@@ -55,13 +55,8 @@ instance (Ord k) => View (MapV k v) where
 instance (Ord k) => EmptyView (MapV k v) where
   emptyV = MapV Map.empty
 
-instance (ToJSON k, ToJSON (g v), Ord k) => ToJSON (MapV k v g) where
-  toJSON = toJSON . Map.toList . unMapV
-
-instance (FromJSON k, FromJSON (g v), Ord k) => FromJSON (MapV k v g) where
-  parseJSON r = do
-    res <- parseJSON r
-    fmap MapV $ sequence $ Map.fromListWithKey (\_ _ -> fail "duplicate key in JSON deserialization of MapV") $ fmap (fmap return) res
+deriving instance (ToJSONKey k, ToJSON (g v), Ord k) => ToJSON (MapV k v g)
+deriving instance (FromJSONKey k, FromJSON (g v), Ord k) => FromJSON (MapV k v g)
 
 instance (Ord k) => Selectable (MapV k v) (Set k) where
   type Selection (MapV k v) (Set k) = MonoidalMap k v
