@@ -30,6 +30,7 @@ import Reflex.Patch (Group(..), Additive)
 import GHC.Generics
 import qualified Data.Map.Monoidal as Map
 import qualified Data.Map as Map'
+import qualified Data.Map.Merge.Strict as Map'
 import Data.Set (Set)
 
 import Data.Vessel.Class hiding (empty)
@@ -39,7 +40,49 @@ import Data.Vessel.ViewMorphism
 
 -- | A functor-indexed container corresponding to Map k v.
 newtype MapV k v g = MapV { unMapV :: MonoidalMap k (g v) }
-  deriving (Eq, Ord, Show, Read, Semigroup, Monoid, Group, Additive, Generic)
+  deriving (Eq, Ord, Show, Read, Generic)
+
+deriving instance (Semigroup v, Ord k) => Semigroup (MapV k v Identity)
+deriving instance (Semigroup v, Ord k) => Monoid (MapV k v Identity)
+deriving instance (Ord k1, Ord k2, Semigroup v) => Semigroup (MapV k1 v (Compose (MonoidalMap k2) Identity))
+
+instance (Ord k, Eq g, Monoid g) => Semigroup (MapV k v (Const g)) where
+  MapV (MonoidalMap xs) <> MapV (MonoidalMap ys) = MapV $ MonoidalMap $ Map'.merge Map'.preserveMissing Map'.preserveMissing (Map'.zipWithMaybeMatched $ \_ (Const x) (Const y) -> f x y) xs ys
+    where
+      f :: g -> g -> Maybe (Const g v)
+      f x y = if xy == mempty then Nothing else Just (Const xy)
+        where
+          xy = x <> y
+
+instance (Ord k, Eq g, Monoid g) => Monoid (MapV k v (Const g)) where
+  mappend = (<>)
+  mempty = MapV Map.empty
+
+instance (Ord k, Eq g, Group g) => Group (MapV k v (Const g)) where
+  negateG (MapV (MonoidalMap xs)) = MapV $ MonoidalMap $ fmap negateG xs
+instance (Ord k, Eq g, Group g, Additive g) => Additive (MapV k v (Const g))
+
+instance (Ord k1, Ord k2, Monoid g, Eq g) => Semigroup (MapV k1 v (Compose (MonoidalMap k2) (Const g))) where
+  MapV (MonoidalMap xs) <> MapV (MonoidalMap ys) = MapV $ MonoidalMap $ Map'.merge Map'.preserveMissing Map'.preserveMissing (Map'.zipWithMaybeMatched $ \_ (Compose (MonoidalMap x)) (Compose (MonoidalMap y)) -> fmap Compose $ nothingOnNull $ MonoidalMap $ mergeMapSemigroup x y) xs ys
+    where
+      nothingOnNull :: Foldable f => f a -> Maybe (f a)
+      nothingOnNull f = if null f then Nothing else Just f
+
+      mergeMapSemigroup :: forall k g. (Ord k, Monoid g, Eq g) => Map'.Map k g -> Map'.Map k g -> Map'.Map k g
+      mergeMapSemigroup = Map'.merge Map'.preserveMissing Map'.preserveMissing (Map'.zipWithMaybeMatched $ const f)
+          where
+            f :: g -> g -> Maybe g
+            f x y = if xy == mempty then Nothing else Just xy
+              where
+                xy = x <> y
+
+instance (Ord k1, Ord k2, Monoid g, Eq g) => Monoid (MapV k1 v (Compose (MonoidalMap k2) (Const g))) where
+  mappend = (<>)
+  mempty = MapV Map.empty
+
+instance (Ord k1, Ord k2, Group g, Eq g) => Group (MapV k1 v (Compose (MonoidalMap k2) (Const g))) where
+  negateG (MapV xs) = MapV $ fmap negateG xs
+instance (Ord k1, Ord k2, Additive g, Group g, Eq g) => Additive (MapV k1 v (Compose (MonoidalMap k2) (Const g)))
 
 instance (Ord k) => View (MapV k v) where
   cropV f (MapV s) (MapV i) = collapseNullV $ MapV (Map.intersectionWithKey (\_ x y -> f x y) s i)
