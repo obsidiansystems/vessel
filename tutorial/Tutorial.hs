@@ -13,6 +13,7 @@
 {-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -Wno-orphans #-}
+module Tutorial where
 
 import Prelude hiding (id, (.), filter)
 
@@ -20,6 +21,8 @@ import Control.Category
 import Control.Lens
 import Control.Monad.IO.Class
 import Control.Monad.Fix
+import Data.Aeson (FromJSON(..), ToJSON(..))
+import Data.Aeson.GADT.TH (deriveJSONGADT)
 import Data.Align
 import Data.Proxy
 import Data.Map (Map)
@@ -254,13 +257,6 @@ instance (Group g, Eq g, Ord k) => Group (GrpMap k g) where
   negateG (GrpMap xs) = GrpMap $ fmap negateG xs
   GrpMap xs ~~ GrpMap ys = GrpMap $ Map.merge id (Map.mapMissing $ const $ negateG) (Map.zipWithMaybeMatched $ const $ liftNonZero (~~)) xs ys
 
-instance Group g => Group (r -> g) where negateG = fmap negateG
-instance Group g => Group (Identity g) where negateG = fmap negateG
-instance Group (Proxy x) where negateG _ = Proxy
-
-instance Group () where negateG _ = ()
-instance (Group a, Group b) => Group (a, b) where negateG (x, y) = (negateG x, negateG y)
-
 class (forall g. (Eq g, Group g) => Group (f g)) => GrpFunctor f where
   mapG :: (Eq b, Group b) => (a -> b) -> f a -> f b
 
@@ -268,8 +264,6 @@ class (forall g. (Eq g, Group g) => Group (f g)) => GrpFunctor f where
 instance GrpFunctor ((->) r) where mapG = fmap
 instance GrpFunctor Proxy where mapG = fmap
 instance GrpFunctor Identity where mapG = fmap
-
-instance Group h => GrpFunctor (Const h) where mapG = fmap
 
 instance Ord k => GrpFunctor (GrpMap k) where
   mapG f (GrpMap xs) = GrpMap $ Map.mapMaybe (\x ->
@@ -281,7 +275,7 @@ instance Ord k => GrpFunctor (GrpMap k) where
 
 
 deriveArgDict ''Qvessel
--- deriveJSONGADT ''Qvessel
+deriveJSONGADT ''Qvessel
 deriveGEq ''Qvessel
 deriveGCompare ''Qvessel
 deriveGShow ''Qvessel
