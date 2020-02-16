@@ -792,12 +792,6 @@ instance (Has' Group f g, Has' Semigroup f g, GCompare f) => Group (MonoidalDMap
 
 instance (Has' Group f g, Has' Semigroup f g, GCompare f) => Additive (MonoidalDMap f g)
 
-instance Group g => Group (Const g x) where
-  negateG (Const a) = Const (negateG a)
-  (Const a) ~~ (Const b) = Const (a ~~ b)
-
-instance Additive g => Additive (Const g x)
-
 instance (Semigroup (f (g a))) => Semigroup (Compose f g a) where
   (Compose x) <> (Compose y) = Compose (x <> y)
 
