@@ -12,6 +12,7 @@ build-type:         Simple
 extra-source-files:
   ChangeLog.md
   README.md
+  tutorial/Tutorial.md
 
 cabal-version:      >=1.10
 category:           Data
@@ -64,32 +65,49 @@ library
   default-language: Haskell2010
 
 library tutorial
-  hs-source-dirs:      tutorial
-  exposed-modules:     Tutorial
-  default-language:    Haskell2010
-  other-extensions:    FlexibleInstances, GeneralizedNewtypeDeriving, RankNTypes, ScopedTypeVariables, StandaloneDeriving, TypeFamilies, UndecidableInstances
-  build-depends:       base >=4.9 && <4.13
-                     , vessel
-                     , aeson
-                     , aeson-gadt-th
-                     , containers
-                     , constraints
-                     , constraints-extras
-                     , dependent-map
-                     , dependent-sum
-                     , dependent-sum-template
-                     , dependent-sum-aeson-orphans
-                     , dependent-monoidal-map
-                     , lens
-                     , monoidal-containers
-                     , mtl
-                     , reflex
-                     , reflex-dom-core
-                     , semialign
-                     , text
-                     , these
-                     , witherable
-
+  hs-source-dirs:   tutorial
+  exposed-modules:  Tutorial
+  default-language: Haskell2010
+  default-extensions:
+    FlexibleContexts
+    FlexibleInstances
+    GADTs
+    GeneralizedNewtypeDeriving
+    LambdaCase
+    MultiParamTypeClasses
+    OverloadedStrings
+    QuantifiedConstraints
+    RankNTypes
+    RecursiveDo
+    RoleAnnotations
+    ScopedTypeVariables
+    StandaloneDeriving
+    TemplateHaskell
+    TypeFamilies
+    UndecidableInstances
+  ghc-options:      -Wall -optL -q
+  build-depends:
+      aeson
+    , aeson-gadt-th
+    , base
+    , constraints
+    , constraints-extras
+    , containers
+    , dependent-map
+    , dependent-monoidal-map
+    , dependent-sum
+    , dependent-sum-aeson-orphans
+    , dependent-sum-template
+    , lens
+    , monoidal-containers
+    , mtl
+    , reflex
+    , reflex-dom-core
+    , semialign
+    , text
+    , these
+    , vessel
+    , witherable
 
 source-repository head
   type:     git
