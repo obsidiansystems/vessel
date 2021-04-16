@@ -85,7 +85,7 @@ library tutorial
     TemplateHaskell
     TypeFamilies
     UndecidableInstances
-  ghc-options:      -Wall -optL -q
+  ghc-options:      -Wall  -pgmL markdown-unlit
   build-depends:
       aeson
     , aeson-gadt-th
@@ -99,6 +99,7 @@ library tutorial
     , dependent-sum-aeson-orphans
     , dependent-sum-template
     , lens
+    , markdown-unlit
     , monoidal-containers
     , mtl
     , reflex
