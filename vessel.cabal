@@ -89,6 +89,7 @@ library tutorial
     TypeFamilies
     UndecidableInstances
   ghc-options:      -Wall  -pgmL markdown-unlit
+  build-tool-depends: markdown-unlit:markdown-unlit
   build-depends:
       aeson
     , aeson-gadt-th
