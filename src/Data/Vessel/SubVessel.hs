@@ -35,6 +35,7 @@ import Data.Map.Monoidal (MonoidalMap(..))
 import Data.Proxy
 import Data.Set (Set)
 import Data.Some (Some(Some))
+import Data.Type.Equality
 import GHC.Generics
 import Reflex.Patch (Group(..), Additive)
 import Reflex.Query.Class
