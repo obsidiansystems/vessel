@@ -52,9 +52,3 @@ import Data.Vessel.Map as X
 import Data.Vessel.Single as X
 import Data.Vessel.SubVessel as X
 import Data.Vessel.ViewMorphism as X
-
-
---------------------------------------------------
-
--- TODO: Class for fromDistinctAscList? In condenseV and disperseV, we might be able to improve the cost relative to
--- combining many singleton maps, if we know those maps are presented to us in sorted order.
