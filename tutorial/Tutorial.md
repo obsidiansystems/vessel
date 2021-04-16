@@ -12,6 +12,7 @@ import Prelude hiding (id, (.), filter)
 
 import Control.Category
 import Control.Lens
+import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Fix
 import Data.Aeson (FromJSON(..), ToJSON(..))
@@ -24,7 +25,7 @@ import Data.Semigroup (First(..), Max(..))
 import Data.Dependent.Map (DMap)
 import Data.Text (Text)
 import Reflex
-import Reflex.Dom.Core
+import Reflex.Network
 import qualified Data.Map as Map
 import qualified Data.Map.Merge.Strict as Map
 
@@ -152,8 +153,8 @@ displayLatestPost
      , MonadQuery t (Qsimple SelectedCount) m
      , QueryResult (Qsimple SelectedCount) ~ Rsimple
      , Reflex t
-     , DomBuilder t m
      , PostBuild t m
+     , Widget t m
      )
   => m ()
 displayLatestPost = do
@@ -167,12 +168,12 @@ displayLatestPost = do
         Just dId -> displayPost dId
 
 displayPost
-  :: ( DomBuilder t m
-     , MonadQuery t (Qsimple SelectedCount) m
+  :: ( MonadQuery t (Qsimple SelectedCount) m
      , QueryResult (Qsimple SelectedCount) ~ Rsimple
      , PostBuild t m
      , MonadHold t m
      , MonadFix m
+     , Widget t m
      )
   => Dynamic t PostId -> m ()
 displayPost postId = do
@@ -247,13 +248,24 @@ viewLatestPostId :: (MonadQuery t (Vessel Qvessel (Const SelectedCount)) m, Refl
 viewLatestPostId = (fmap.fmap.fmap) (getMax . runIdentity) $ queryViewMorphism 1 $ constDyn $ vessel LatestPostId . identityV
 
 ```
-
 Feel free to ignore everything below this line; this is just to force me to get
 other types "right".
 
 ***
 
 ```haskell
+
+-- To avoid requiring reflex-dom, we stub out a few functions that you'd normally get from reflex-dom-core.
+type Widget t m = (NotReady t m, Adjustable t m, PostBuild t m)
+
+dyn_ :: (NotReady t m, Adjustable t m, PostBuild t m) => Dynamic t (m a) -> m ()
+dyn_ = void . networkView
+
+text :: Monad m => Text -> m ()
+text _ = pure ()
+
+dynText :: Monad m => Dynamic t Text -> m ()
+dynText _ = pure ()
 
 positive :: forall x. (Monoid x, Ord x) => x -> SelectedCount
 positive x
@@ -263,12 +275,11 @@ positive x
 
 dischargeMonadQuery :: forall v t m a.
   ( Additive (v SelectedCount), Group (v SelectedCount), PerformEvent t m, GrpFunctor v, Eq (v SelectedCount)
-  , Monoid (QueryResult (v SelectedCount)), PostBuild t m, MonadHold t m, MonadFix m
+  , Monoid (QueryResult (v SelectedCount)), PostBuild t m, MonadHold t m, MonadFix m, Widget t m
   , Query (v SelectedCount)
-  , DomBuilder t m
   )
   => (v SelectedCount -> Performable m (QueryResult (v SelectedCount)))
-  -> (forall m'. (PostBuild t m', MonadHold t m', DomBuilder t m', MonadFix m', MonadQuery t (v SelectedCount) m') => m' a)
+  -> (forall m'. (PostBuild t m', MonadHold t m', Widget t m', MonadFix m', MonadQuery t (v SelectedCount) m') => m' a)
   -> m a
 dischargeMonadQuery getQueryResult widget = mdo
 
@@ -295,11 +306,11 @@ readShowLatestPost
   :: ( MonadIO (Performable m)
      , PerformEvent t m
      , PostBuild t m
-     , DomBuilder t m
      , MonadHold t m
      , MonadFix m
      , Query (Qsimple SelectedCount)
      , QueryResult (Qsimple SelectedCount) ~ Rsimple
+     , Widget t m
      )
   => m ()
 readShowLatestPost = dischargeMonadQuery promtForIt displayLatestPost
@@ -343,8 +354,6 @@ instance Ord k => GrpFunctor (GrpMap k) where
     in if fx /= mempty
     then Just fx
     else Nothing) xs
-
-
 
 deriveArgDict ''Qvessel
 deriveJSONGADT ''Qvessel
