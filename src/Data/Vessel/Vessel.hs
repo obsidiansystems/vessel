@@ -41,7 +41,7 @@ import Data.Witherable
 import Data.Vessel.Internal
 import GHC.Generics
 import Reflex.Query.Class
-import Reflex.Patch (Group(..), Additive)
+import Data.Patch (Group(..), Additive)
 import Data.Functor.Compose
 import Data.Align
 import qualified Data.Dependent.Map as DMap'

@@ -37,7 +37,7 @@ import Data.Set (Set)
 import Data.Some (Some(Some))
 import Data.Type.Equality
 import GHC.Generics
-import Reflex.Patch (Group(..), Additive)
+import Data.Patch (Group(..), Additive)
 import Reflex.Query.Class
 import qualified Data.Dependent.Map as DMap'
 import qualified Data.Dependent.Map.Monoidal as DMap

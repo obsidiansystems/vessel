@@ -26,7 +26,7 @@ import Data.Foldable
 import Data.Functor.Identity
 import Data.Functor.Compose
 import Data.Map.Monoidal (MonoidalMap (..))
-import Reflex.Patch (Group(..), Additive)
+import Data.Patch (Group(..), Additive)
 import GHC.Generics
 import qualified Data.Map.Monoidal as Map
 import qualified Data.Map as Map'

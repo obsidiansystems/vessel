@@ -21,7 +21,7 @@
 module Data.Vessel.Single where
 
 import Data.These
-import Reflex.Patch (Group(..), Additive)
+import Data.Patch (Group(..), Additive)
 import Data.Semigroup
 import Data.Functor.Identity
 import Data.Witherable

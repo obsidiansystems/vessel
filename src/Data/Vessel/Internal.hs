@@ -37,7 +37,7 @@ import Data.Some (Some(Some))
 import Data.Map.Monoidal (MonoidalMap (..))
 import qualified Data.Map.Monoidal as Map
 import Data.These
-import Reflex.Patch (Group(..), Additive)
+import Data.Patch (Group(..), Additive)
 import Data.Coerce
 import Data.Set (Set)
 import Data.Witherable
@@ -88,12 +88,6 @@ instance (Has' Group f g, Has' Semigroup f g, GCompare f) => Group (MonoidalDMap
   negateG (MonoidalDMap m) = MonoidalDMap (DMap'.mapWithKey (\k v -> has' @Group @g k (negateG v)) m)
 
 instance (Has' Group f g, Has' Semigroup f g, GCompare f) => Additive (MonoidalDMap f g)
-
-instance Group g => Group (Const g x) where
-  negateG (Const a) = Const (negateG a)
-  (Const a) ~~ (Const b) = Const (a ~~ b)
-
-instance Additive g => Additive (Const g x)
 
 instance (Semigroup (f (g a))) => Semigroup (Compose f g a) where
   (Compose x) <> (Compose y) = Compose (x <> y)

@@ -20,7 +20,7 @@
 module Data.Vessel.Identity where
 
 import Data.Aeson
-import Reflex.Patch (Group(..), Additive)
+import Data.Patch (Group(..), Additive)
 import GHC.Generics
 import Data.Functor.Compose
 import Data.Functor.Const

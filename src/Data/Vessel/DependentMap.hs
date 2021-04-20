@@ -35,7 +35,7 @@ import Data.Dependent.Sum
 import Data.Dependent.Sum.Orphans ()
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Reflex.Patch (Group(..), Additive)
+import Data.Patch (Group(..), Additive)
 import qualified Data.Dependent.Map as DMap'
 import qualified Data.Dependent.Map.Monoidal as DMap
 
