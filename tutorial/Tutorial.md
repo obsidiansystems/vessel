@@ -88,9 +88,9 @@ that the result can be updated as new data is sent to the frontend; with
 values above.
 
 Those are also the reason for the Maybe wrappers in both cases,  it's
-neccessary to distinguish the two states of "the data is absent because it
+necessary to distinguish the two states of "the data is absent because it
 doesn't exist in the backend" from "the data is absent because you haven't
-recieved it yet".
+received it yet".
 
 ```haskell
 
@@ -102,9 +102,9 @@ instance Monoid Rsimple where { mempty = Rsimple mempty mempty }
 We associate the two types, query and response, with Query;  which is also
 essentially boilerplate code.  The single method for Query; crop, should
 restrict the query result to only that which matches the query.  Crop has two
-essential duities.  It's used in query handlers that call runQueryT.
+essential duties.  It's used in query handlers that call runQueryT.
 
-```hakell
+```haskell
 
 instance Query (Qsimple g) where
   type QueryResult (Qsimple g) = Rsimple
@@ -114,13 +114,13 @@ instance Query (Qsimple g) where
 ```
 
 We now can write code that "queries" for posts.  Note that the distinction
-between "not yet loaded"  and "doesnt exist at all" is reflected in two
-different Maybe's.  resist the urge to "join" the two together.  That's a sure
-recipe for annoying glitches which flashes "deleted" right before showing the
+between "not yet loaded" and "doesnt exist at all" is reflected in two
+different Maybe's.  Resist the urge to "join" the two together.  That's a sure
+recipe for annoying glitches which flash "deleted" right before showing the
 user their data.
 
 Once again we see some amount of boilerplate; we construct the query by
-building up from the given  field; and then need to tear down the query result
+building up from the given field; and then need to tear down the query result
 by examining the corresponding field.
 
 ```haskell
@@ -192,7 +192,7 @@ We can try to improve the situation in essentially all of these cases above by
 factoring out the common parts using something resembling the HKD Pattern; when
 we need to associate a group with each query; we can use `Const g`; and for the
 result which demands only the result data for that key, we can use Identity. A
-downside is that the boilerplate instances, even the ones that be normally be
+downside is boilerplate instances, even ones that be normally be
 derived.
 
 ```haskell
@@ -224,7 +224,7 @@ type Qtag_response = DMap Qtag Identity
 
 Vessel takes this idea a bit further; where the above approach uses parameters
 as values, vessel makes it "recursive";  the GADTs used have "functor"
-parameters, and most the applied types are also functor parametric.
+parameters, and most of the applied types are also functor parametric.
 
 ```haskell
 
