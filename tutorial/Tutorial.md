@@ -188,12 +188,13 @@ displayPost postId = do
 
 ```
 
-We can try to improve the situation in essentially all of these cases above by
-factoring out the common parts using something resembling the HKD Pattern; when
-we need to associate a group with each query; we can use `Const g`; and for the
-result which demands only the result data for that key, we can use Identity. A
-downside is boilerplate instances, even ones that be normally be
-derived.
+We can try to improve the situation in essentially all of
+these cases above by factoring out the common parts using
+something resembling the HKD Pattern; when we need to
+associate a group with each query; we can use `Const g`; and
+for the result which demands only the result data for that
+key, we can use Identity. A downside is boilerplate
+instances, even ones that can normally be derived.
 
 ```haskell
 
