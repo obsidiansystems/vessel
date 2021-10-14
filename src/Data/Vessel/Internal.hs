@@ -96,6 +96,8 @@ instance (Monoid (f (g a))) => Monoid (Compose f g a) where
   mempty = Compose mempty
   mappend (Compose x) (Compose y) = Compose (mappend x y)
 
+instance (Additive (f (g a))) => Additive (Compose f g a)
+
 ------- Miscellaneous stuff to be moved elsewhere -------
 
 -- TODO: These belong in Data.Functor.Compose -- good luck to anyone who wants to upstream them into base though.
