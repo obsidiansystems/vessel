@@ -1,5 +1,5 @@
 name:               vessel
-version:            0.1.0.0
+version:            0.1.1.0
 description:
   A dependently-typed key-value data structure that allows for storage of both "queries", (wherein keys are stored along with reasons for selecting the items or counts of the number of times something has been selected), as well as the responses to those queries, in which the type of the key additionally determines the type of the response
 
