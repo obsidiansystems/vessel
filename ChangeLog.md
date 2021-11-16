@@ -1,6 +1,6 @@
 # Revision history for vessel
 
-## Unreleased
+## 0.2.0.0
 
 * Add an orphan instance for 'Additive' of 'Compose' this is in line with the other orphans for 'Compose' that will be phased out in a future release in favor of an upstream solution.
 
