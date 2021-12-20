@@ -34,6 +34,10 @@ module Data.Vessel
   , traverseSubVessel
   , singletonSubVessel
   , lookupSubVessel
+  , Path(..)
+  , (~>)
+  , Keyed(..)
+  , SetKeyed(..)
   ) where
 
 import Data.Functor.Compose
@@ -52,3 +56,4 @@ import Data.Vessel.Map as X
 import Data.Vessel.Single as X
 import Data.Vessel.SubVessel as X
 import Data.Vessel.ViewMorphism as X
+import Data.Vessel.Path as X

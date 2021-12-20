@@ -26,6 +26,7 @@ import Data.Bifunctor
 import Data.Constraint.Extras
 import Data.Constraint.Forall
 import Data.Dependent.Map.Monoidal (MonoidalDMap(..))
+import qualified Data.Dependent.Map.Monoidal as MonoidalDMap
 import Data.Functor.Compose
 import Data.GADT.Compare
 import Data.Some (Some(Some))
@@ -82,3 +83,8 @@ instance (GCompare k) => Selectable (DMapV k v) (Set (Some k)) where
     fmap (\(Some k) -> k :=> Compose p) (Set.toList s)
   selection _ (DMapV m) = DMap.map (\(Compose (Identity v)) -> v) m
 
+singletonDMapV :: k a -> g (v a) -> DMapV k v g
+singletonDMapV k v = DMapV $ MonoidalDMap.singleton k (Compose v)
+
+lookupDMapV :: GCompare k => k a -> DMapV k v g -> Maybe (g (v a))
+lookupDMapV k (DMapV m) = getCompose <$> MonoidalDMap.lookup k m

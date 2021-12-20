@@ -29,6 +29,7 @@ library
     Data.Vessel.Identity
     Data.Vessel.Internal
     Data.Vessel.Map
+    Data.Vessel.Path
     Data.Vessel.Selectable
     Data.Vessel.Single
     Data.Vessel.SubVessel
