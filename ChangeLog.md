@@ -1,5 +1,9 @@
 # Revision history for vessel
 
+## 0.2.2.0
+
+* Allow `Vessel` and `DMapV` types to be more liberally kinded in their indexes.
+
 ## 0.2.1.0
 
 * Add Data.Vessel.Path. See that module for documentation.

@@ -58,13 +58,17 @@ import Data.Vessel.ViewMorphism
 -- discussed above, keyed by a GADT whose index will specify which sort of container goes in each position.
 --
 -- Ordinary types with values have kind *
--- Functors have kind * -> *
--- Containers taking a functor as a parameter then have kind (* -> *) -> *
--- The keys of a vessel are indexed by a functor-parametric container type, so they have kind ((* -> *) -> *) -> *
+-- Functors have kind k -> *
+-- Containers taking a functor as a parameter then have kind (k -> *) -> *
+-- The keys of a vessel are indexed by a functor-parametric container type, so they have kind ((k -> *) -> *) -> *
 -- Vessel itself, for any such key type, produces a functor-parametric container, so it has kind
+-- (((k -> *) -> *) -> *) -> (k -> *) -> *
+--
+-- The majority of use cases will be working entirely within * so that Vessel will be instantiated to the kind
 -- (((* -> *) -> *) -> *) -> (* -> *) -> *
+--
 -- Law: None of the items in the Vessel's MonoidalDMap are nullV
-newtype Vessel (k :: ((* -> *) -> *) -> *) (g :: * -> *) = Vessel { unVessel :: MonoidalDMap k (FlipAp g) }
+newtype Vessel (k :: ((x -> *) -> *) -> *) (g :: x -> *) = Vessel { unVessel :: MonoidalDMap k (FlipAp g) }
   deriving (Generic)
 
 deriving instance (GCompare k, Has' Eq k (FlipAp g)) => Eq (Vessel k g)
