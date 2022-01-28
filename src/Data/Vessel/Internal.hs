@@ -89,13 +89,6 @@ instance (Has' Group f g, Has' Semigroup f g, GCompare f) => Group (MonoidalDMap
 
 instance (Has' Group f g, Has' Semigroup f g, GCompare f) => Additive (MonoidalDMap f g)
 
-instance (Semigroup (f (g a))) => Semigroup (Compose f g a) where
-  (Compose x) <> (Compose y) = Compose (x <> y)
-
-instance (Monoid (f (g a))) => Monoid (Compose f g a) where
-  mempty = Compose mempty
-  mappend (Compose x) (Compose y) = Compose (mappend x y)
-
 instance (Additive (f (g a))) => Additive (Compose f g a)
 
 ------- Miscellaneous stuff to be moved elsewhere -------
