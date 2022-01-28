@@ -33,6 +33,7 @@ import Data.Dependent.Map.Monoidal (MonoidalDMap(..))
 import Data.Functor.Compose
 import Data.Functor.Const
 import Data.GADT.Compare
+import Data.Orphans ()
 import Data.Some (Some(Some))
 import Data.Map.Monoidal (MonoidalMap (..))
 import qualified Data.Map.Monoidal as Map
