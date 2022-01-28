@@ -48,6 +48,7 @@ library
   build-depends:
       aeson                        >=1.4     && <1.6
     , base                         >=4.9     && <4.15
+    , base-orphans                 ^>=0.8.5
     , bifunctors                   ^>=5.5
     , constraints                  >=0.10    && <0.15
     , constraints-extras           ^>=0.3
