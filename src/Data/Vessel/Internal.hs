@@ -67,7 +67,7 @@ instance Additive (v g) => Additive (FlipAp g v)
 
 
 -- A single Vessel key/value pair, essentially a choice of container type, together with a corresponding container.
-data VSum (k :: ((* -> *) -> *) -> *) (g :: * -> *) = forall v. k v :~> v g
+data VSum (k :: ((x -> *) -> *) -> *) (g :: x -> *) = forall v. k v :~> v g
 
 ------- Serialisation -------
 

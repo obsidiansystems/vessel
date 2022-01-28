@@ -17,6 +17,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Data.Vessel.Class where
 
@@ -59,7 +60,7 @@ import Data.Vessel.Internal
 --
 -- It also specifies the cropV operation which restricts a view to a particular selection, as well
 -- as operations for mapping functions over all the leaves of the container.
-class View (v :: (* -> *) -> *) where
+class View (v :: (x -> *) -> *) where
   -- | Transpose a sufficiently-Map-like structure into a container, effectively aggregating
   -- many structures into a single one containing information about which keys each part of it
   -- came from originally.

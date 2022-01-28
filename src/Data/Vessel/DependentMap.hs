@@ -45,7 +45,7 @@ import Data.Vessel.Selectable
 import Data.Vessel.Internal
 
 -- | A functor-indexed container corrresponding to DMap k v.
-newtype DMapV (k :: * -> *) (v :: * -> *) g = DMapV { unDMapV :: MonoidalDMap k (g :.: v) }
+newtype DMapV (k :: x -> *) (v :: x -> *) g = DMapV { unDMapV :: MonoidalDMap k (g :.: v) }
   deriving (Generic)
 
 deriving instance (GCompare k, Has' Eq k (g :.: v)) => Eq (DMapV k v g)
