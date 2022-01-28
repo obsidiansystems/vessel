@@ -43,6 +43,7 @@ import Data.Set (Set)
 import Data.Witherable
 import qualified Data.Map as Map'
 import qualified Data.Map.Merge.Strict as Map'
+import GHC.Generics
 
 import qualified Data.Dependent.Map.Monoidal as DMap
 -- import qualified Data.Dependent.Map as DMap'
@@ -100,6 +101,12 @@ assocLCompose (Compose x) = Compose (Compose (fmap getCompose x))
 
 assocRCompose :: (Functor f) => Compose (Compose f g) h x -> Compose f (Compose g h) x
 assocRCompose (Compose (Compose x)) = Compose (fmap Compose x)
+
+assocLComposeComp :: (Functor f) => (Compose f (g :.: h)) x -> ((Compose f g) :.: h) x
+assocLComposeComp (Compose x) = Comp1 $ Compose (fmap unComp1 x)
+
+assocRComposeComp :: (Functor f) => ((Compose f g) :.: h) x -> Compose f (g :.: h) x
+assocRComposeComp (Comp1 (Compose x)) = Compose (fmap Comp1 x)
 
 alignWithKeyMaybeDMap :: GCompare k => (forall a. k a -> These (f a) (g a) -> Maybe (h a)) -> DMap k f -> DMap k g -> DMap k h
 alignWithKeyMaybeDMap f a b = DMap'.mapMaybeWithKey (\k t -> f k $ dtheseToThese t) $ DMap'.unionWithKey (\_ (DThis x) (DThat y) -> DThese x y) (DMap'.map DThis a) (DMap'.map DThat b)
