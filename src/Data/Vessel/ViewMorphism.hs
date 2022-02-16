@@ -35,11 +35,14 @@ import Reflex.Query.Class
 import Reflex.Class
 import Data.Align
 import Data.Vessel.Internal ()
+import Data.Proxy
 
 type family ViewQueryResult (v :: k) :: k
 
 type instance ViewQueryResult (Const g x) = Identity x
 type instance ViewQueryResult (Const g) = Identity
+type instance ViewQueryResult (Proxy x) = Identity x
+type instance ViewQueryResult Proxy = Identity
 type instance ViewQueryResult (a, b) = These (ViewQueryResult a) (ViewQueryResult b)
 
 -- a way to request partially loaded information;
