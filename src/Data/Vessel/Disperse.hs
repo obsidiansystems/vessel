@@ -74,3 +74,10 @@ instance Ord k => Disperse (MonoidalMap k) where
     One k v -> fmap (Map.singleton k) v
     Split pivot _l _r -> uncurry (alignWith (mergeThese unionDistinctAsc)) $ condense *** condense $ splitLT pivot row
 
+instance Disperse Maybe where
+  disperse xs =
+    let xs' = catMaybes xs
+    in if null xs' then Nothing else Just xs'
+  condense = \case
+    Nothing -> nil
+    Just xs -> Just <$> xs

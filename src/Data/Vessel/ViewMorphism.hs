@@ -45,11 +45,42 @@ type instance ViewQueryResult (Proxy x) = Identity x
 type instance ViewQueryResult Proxy = Identity
 type instance ViewQueryResult (a, b) = These (ViewQueryResult a) (ViewQueryResult b)
 
--- a way to request partially loaded information;
+-- | a way to bundle a request of partially loaded information
+--
+-- `m` counts the number of occurrences in the query of `q` in `p`
+-- `n` counts the number of occurrences in the result of `p` in `q`
+--
+-- a ViewHalfMorphism representing the pull side, something like
+-- $ViewHalfMorphism Identity Maybe leaf root$ expresses a way to turn a leaf
+-- query into a root query, and to look up a leaf query result in a root query
+-- result, if its present.
+--
+-- respectively , a push side ViewHalfMorphism, something like
+-- $ViewHalfMorphism Maybe Identity root leaf$ is a way to look up a leaf query
+-- in a root query, if its there, and a way to turn a leaf result into a root
+-- result.
 data ViewHalfMorphism m n p q = ViewHalfMorphism
   { _viewMorphism_mapQuery :: p -> m q
   , _viewMorphism_mapQueryResult :: ViewQueryResult q -> n (ViewQueryResult p) -- TODO Loading data
   }
+
+mapViewHalfMorphism
+  :: Monad m
+  => ViewHalfMorphism f g a b
+  -> (f b -> m (ViewQueryResult b))
+  -> a
+  -> m (g (ViewQueryResult a))
+mapViewHalfMorphism v f x =
+  _viewMorphism_mapQueryResult v <$> f (_viewMorphism_mapQuery v x)
+
+traverseViewHalfMorphism
+  :: (Traversable f, Applicative m)
+  => ViewHalfMorphism f g a b
+  -> (b -> m (ViewQueryResult b))
+  -> a
+  -> m (f (g (ViewQueryResult a)))
+traverseViewHalfMorphism v f x =
+  traverse (fmap (_viewMorphism_mapQueryResult v) . f) (_viewMorphism_mapQuery v x)
 
 data ViewMorphism m n p q = ViewMorphism
   { _viewMorphism_to ::   ViewHalfMorphism m n p q
