@@ -35,9 +35,8 @@ library
     Data.Vessel.SubVessel
     Data.Vessel.Vessel
     Data.Vessel.ViewMorphism
-
     Data.Vessel.ViewMorphism.Cartesian
-
+    Data.Vessel.ViewMorphism.Debug
 
   other-modules:
     Data.Vessel.Orphans
