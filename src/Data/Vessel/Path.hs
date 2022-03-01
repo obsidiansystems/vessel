@@ -10,6 +10,7 @@ import Control.Monad.Fix
 import qualified Data.Dependent.Map.Monoidal as MonoidalDMap
 import Data.GADT.Compare
 import Data.Map (Map)
+import Data.Functor.Identity (Identity(..))
 import qualified Data.Map as Map
 import Data.Map.Monoidal
 import Data.Semigroup (First(..))
@@ -21,6 +22,7 @@ import Data.Vessel.Map hiding (mapV)
 import Data.Vessel.Single hiding (singleV)
 import Data.Vessel.SubVessel hiding (subVessel)
 import Data.Vessel.Vessel hiding (vessel)
+import Data.Vessel.ViewMorphism (ViewMorphism(..), ViewHalfMorphism(..), ViewQueryResult)
 import Reflex
 
 -- | A (Path v w w' v') consists of maps in opposite directions:
@@ -162,3 +164,12 @@ singleV = Path
 -- and extracting the pair of results afterward.
 zip :: (Semigroup c) => Path a c c' a' -> Path b c c' b' -> Path (a, b) c c' (a', b')
 zip (Path to from) (Path to' from') = Path (\(x,y) -> to x <> to' y) (\c -> liftA2 (,) (from c) (from' c))
+
+-- | A ViewMorphism can be used as a Path to a ViewQueryResult
+vPath :: ViewMorphism Identity Maybe a b -> Path a b (ViewQueryResult b) (ViewQueryResult a)
+vPath = vPath' . _viewMorphism_to
+
+-- | A ViewHalfMorphism can be used as a Path to a ViewQueryResult
+vPath' :: ViewHalfMorphism Identity Maybe a b -> Path a b (ViewQueryResult b) (ViewQueryResult a)
+vPath' (ViewHalfMorphism f g) = Path (runIdentity . f) g
+
