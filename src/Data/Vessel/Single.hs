@@ -85,22 +85,22 @@ instance Selectable (SingleV a) () where
 lookupSingleV :: SingleV a Identity -> Maybe a
 lookupSingleV = getFirst . runIdentity . unSingleV
 
-type instance ViewQueryResult (SingleV a (Const g)) = SingleV a Identity
+type instance ViewQueryResult (SingleV a f) = SingleV a (ViewQueryResult f)
 
 -- Note.  the result functions always return Just;  a "Single" is always
 -- present in the result, only that the value it may be is possibly a Nothing.
-singleV :: (Applicative m, Applicative n) => ViewMorphism m n (Const g (Maybe a)) (SingleV a (Const g))
+singleV :: (Applicative m, Applicative n, Functor f, Functor (ViewQueryResult f), ViewQueryResult f (Maybe a) ~ ViewQueryResult (f (Maybe a))) => ViewMorphism m n (f (Maybe a)) (SingleV a f)
 singleV = ViewMorphism toSingleV fromSingleV
 
-toSingleV :: (Applicative m, Applicative n) => ViewHalfMorphism m n (Const g (Maybe a)) (SingleV a (Const g))
+toSingleV :: (Functor f, Functor (ViewQueryResult f), Applicative m, Applicative n, ViewQueryResult f (Maybe a) ~ ViewQueryResult (f (Maybe a))) => ViewHalfMorphism m n (f (Maybe a)) (SingleV a f)
 toSingleV = ViewHalfMorphism
-  { _viewMorphism_mapQuery = \(Const x) -> pure . SingleV $ Const x
-  , _viewMorphism_mapQueryResult = \(SingleV (Identity (First x))) -> pure (Identity x)
+  { _viewMorphism_mapQuery = \xs -> pure . SingleV $ fmap First xs
+  , _viewMorphism_mapQueryResult = \(SingleV xs) -> pure $ fmap getFirst xs
   }
 
-fromSingleV :: (Applicative m, Applicative n) => ViewHalfMorphism m n (SingleV a (Const g)) (Const g (Maybe a))
+fromSingleV :: (Functor f, Functor (ViewQueryResult f), Applicative m, Applicative n, ViewQueryResult f (Maybe a) ~ ViewQueryResult (f (Maybe a))) => ViewHalfMorphism m n (SingleV a f) (f (Maybe a))
 fromSingleV = ViewHalfMorphism
-  { _viewMorphism_mapQuery = \(SingleV (Const g)) -> pure $ Const g
+  { _viewMorphism_mapQuery = \(SingleV xs) -> pure $ fmap getFirst xs
   , _viewMorphism_mapQueryResult = pure . SingleV . fmap First
   }
 -- | A gadget to "traverse" over a SingleV

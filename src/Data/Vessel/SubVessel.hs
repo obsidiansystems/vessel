@@ -41,6 +41,7 @@ import Data.Patch (Group(..), Additive)
 import Reflex.Query.Class
 import qualified Data.Dependent.Map as DMap'
 import qualified Data.Dependent.Map.Monoidal as DMap
+import qualified Data.Map as Map'
 import qualified Data.Map.Monoidal as Map
 
 import Data.Vessel.Class hiding (empty)
@@ -206,6 +207,25 @@ mapMaybeWithKeySubVessel f (SubVessel xs) = SubVessel (mapMaybeWithKeyV @(SubVes
   where
     f' :: forall x . SubVesselKey k v x -> x g -> Maybe (x g')
     f' (SubVesselKey k) = f k
+
+mapMaybeWithKeySubVesselSlow
+  :: forall k (v :: (* -> *) -> *) v' (g :: * -> *) (g' :: * -> *).
+    Ord k
+  => (k -> v g -> Maybe (v' g'))
+  -> SubVessel k v g
+  -> SubVessel k v' g'
+mapMaybeWithKeySubVesselSlow f = mkSubVessel . Map.mapMaybeWithKey f . getSubVessel
+
+traverseMaybeSubVesselSlow
+  :: (Ord k, Applicative m)
+  => (k -> v g -> m (Maybe (v' h)))
+  -> SubVessel k v g
+  -> m (SubVessel k v' h)
+traverseMaybeSubVesselSlow f =
+  fmap (mkSubVessel . Map.MonoidalMap)
+  . Map'.traverseMaybeWithKey f
+  . Map.getMonoidalMap
+  . getSubVessel
 
 
 uncurrySubVessel :: (Ord k1, Ord k2) => MonoidalMap k1 (SubVessel k2 v f) -> SubVessel (k1, k2) v f

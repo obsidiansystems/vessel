@@ -16,6 +16,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Data.Vessel.Identity where
 
@@ -54,17 +55,17 @@ instance Selectable (IdentityV a) () where
 lookupIdentityV :: IdentityV a Identity -> a
 lookupIdentityV = runIdentity . unIdentityV
 
-type instance ViewQueryResult (IdentityV a (Const g)) = IdentityV a Identity
+type instance ViewQueryResult (IdentityV a f) = IdentityV a (ViewQueryResult f)
 
-identityV :: (Applicative m, Applicative n) => ViewMorphism m n (Const g a) (IdentityV a (Const g))
+identityV :: (Applicative m, Applicative n, ViewQueryResult (f a) ~ ViewQueryResult f a) => ViewMorphism m n (f a) (IdentityV a f)
 identityV = ViewMorphism toIdentityV fromIdentityV
 
-toIdentityV :: (Applicative m, Applicative n) => ViewHalfMorphism m n (Const g a) (IdentityV a (Const g))
+toIdentityV :: (Applicative m, Applicative n, ViewQueryResult (f a) ~ ViewQueryResult f a) => ViewHalfMorphism m n (f a) (IdentityV a f)
 toIdentityV = ViewHalfMorphism
   { _viewMorphism_mapQuery = pure . IdentityV
   , _viewMorphism_mapQueryResult = pure . unIdentityV
   }
-fromIdentityV :: (Applicative m, Applicative n) => ViewHalfMorphism m n (IdentityV a (Const g)) (Const g a)
+fromIdentityV :: (Applicative m, Applicative n, ViewQueryResult (f a) ~ ViewQueryResult f a) => ViewHalfMorphism m n (IdentityV a f) (f a)
 fromIdentityV = ViewHalfMorphism
   { _viewMorphism_mapQuery = pure . unIdentityV
   , _viewMorphism_mapQueryResult = pure . IdentityV
