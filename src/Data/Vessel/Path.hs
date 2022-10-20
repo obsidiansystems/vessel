@@ -152,10 +152,10 @@ identityV = Path
 -- | This is a @Path@ which wraps/unwraps @SingleV@. Always produces a @SingleV@ containing @Just@ of
 -- the input value on the input side, but unwrapping will result in @Just@ or @Nothing@ according to
 -- whether the response contains a @Just@ or @Nothing@.
-singleV :: (Traversable g', Functor g) => Path (g a) (SingleV a g) (SingleV a g') (g' a)
+singleV :: (Functor g', Functor g) => Path (g a) (SingleV a g) (SingleV a g') (g' (Maybe a))
 singleV = Path
   { _path_to = SingleV . fmap (First . Just)
-  , _path_from = sequenceA . fmap getFirst . unSingleV
+  , _path_from = Just . fmap getFirst . unSingleV
   }
 
 -- | Combines two @Path@s whose full query type is a @Semigroup@, effectively, asking for two things at once,
