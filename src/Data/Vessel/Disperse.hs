@@ -25,7 +25,7 @@ import Data.Foldable hiding (null)
 import Data.Map.Monoidal (MonoidalMap(..))
 import qualified Data.Map.Monoidal as Map
 import Data.These
-import Data.Witherable
+import Witherable
 
 import Data.Vessel.Internal
 

@@ -43,8 +43,8 @@ import Data.Semigroup.Commutative
 import Data.Set (Set)
 import Data.Some (Some(Some))
 import Data.These
-import Data.Witherable
 import GHC.Generics
+import Witherable
 
 import qualified Data.Dependent.Map.Monoidal as DMap
 -- import qualified Data.Dependent.Map as DMap'

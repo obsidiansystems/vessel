@@ -36,9 +36,9 @@ import Data.Maybe (fromMaybe)
 import Data.Proxy
 import Data.Semigroup
 import Data.These
-import Data.Witherable
 import GHC.Generics
 import Reflex.Query.Class
+import Witherable
 
 import Data.Vessel.Internal
 

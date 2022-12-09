@@ -45,7 +45,7 @@ import Data.Semigroup.Commutative
 import Data.Some (Some)
 import Data.These
 import Data.Vessel.Internal
-import Data.Witherable
+import Witherable
 import GHC.Generics
 import Reflex.Query.Class
 

@@ -35,6 +35,7 @@ import Data.GADT.Compare
 import Data.GADT.Show
 import Data.Map.Monoidal (MonoidalMap(..))
 import qualified Data.Map.Monoidal as Map
+import Data.Orphans ()
 import Data.Patch (Group(..))
 import Data.Proxy
 import Data.Semigroup.Commutative
@@ -57,8 +58,7 @@ instance Show k => GShow (SubVesselKey k f) where gshowsPrec = showsPrec
 instance FromJSON k => FromJSON (Some (SubVesselKey k v)) where parseJSON v = Some . SubVesselKey <$> parseJSON v
 instance ToJSON k => ToJSON (SubVesselKey k f g) where toJSON (SubVesselKey k) = toJSON k
 
-instance ArgDict c (SubVesselKey k f) where
-  type ConstraintsFor (SubVesselKey k f) c = c f
+instance (c f) => Has c (SubVesselKey k f) where
   argDict (SubVesselKey _) = Dict
 
 instance Eq k => GEq (SubVesselKey k v) where

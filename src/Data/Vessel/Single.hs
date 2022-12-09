@@ -29,8 +29,8 @@ import Data.Patch (Group(..))
 import Data.Semigroup
 import Data.Semigroup.Commutative
 import Data.These
-import Data.Witherable
 import GHC.Generics (Generic)
+import Witherable
 
 import Data.Vessel.Class
 import Data.Vessel.Selectable
