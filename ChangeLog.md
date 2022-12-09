@@ -4,6 +4,7 @@
 
 * Fix singleV: absent query /= present query for deleted item
 * Use Commutative instead of the deprecated Additive
+* Update for constraints-extras 0.4
 
 ## 0.2.1.0
 
