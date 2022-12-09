@@ -50,6 +50,7 @@ library
     , base                         >=4.9     && <4.17
     , base-orphans                 ^>=0.8.5
     , bifunctors                   ^>=5.5
+    , commutative-semigroups       ^>=0.1
     , constraints                  >=0.10    && <0.15
     , constraints-extras           ^>=0.4
     , containers                   ^>=0.6
@@ -59,7 +60,7 @@ library
     , dependent-sum-aeson-orphans  ^>=0.3.1
     , monoidal-containers          ^>=0.6
     , mtl                          ^>=2.2
-    , patch                        ^>=0.0.4.0
+    , patch                        ^>=0.0.7.0
     , reflex                       >=0.6.4   && <0.9
     , semialign                    >=1
     , these                        >=1 && <1.2

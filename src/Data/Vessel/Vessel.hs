@@ -24,29 +24,30 @@ import Control.Applicative
 import Control.Arrow ((***))
 import Control.Monad
 import Data.Aeson
-import Data.Some (Some)
+import Data.Align
 import Data.Constraint.Extras
-import Data.Functor.Identity
-import Data.Proxy
+import Data.Constraint.Forall
+import qualified Data.Dependent.Map as DMap'
+import Data.Dependent.Map.Internal (DMap(..))
+import Data.Dependent.Map.Monoidal (MonoidalDMap(..))
+import qualified Data.Dependent.Map.Monoidal as DMap
 import Data.Dependent.Sum
 import Data.Dependent.Sum.Orphans ()
-import Data.Constraint.Forall
-import Data.Dependent.Map.Monoidal (MonoidalDMap(..))
-import Data.Dependent.Map.Internal (DMap (..))
 import Data.Foldable hiding (null)
-import qualified Data.Dependent.Map.Monoidal as DMap
+import Data.Functor.Compose
+import Data.Functor.Identity
 import Data.GADT.Compare
 import Data.GADT.Show
-import Data.Witherable
+import Data.Maybe (fromMaybe)
+import Data.Patch (Group(..))
+import Data.Proxy
+import Data.Semigroup.Commutative
+import Data.Some (Some)
+import Data.These
 import Data.Vessel.Internal
+import Data.Witherable
 import GHC.Generics
 import Reflex.Query.Class
-import Data.Patch (Group(..), Additive)
-import Data.Functor.Compose
-import Data.Align
-import qualified Data.Dependent.Map as DMap'
-import Data.Maybe (fromMaybe)
-import Data.These
 
 import Data.Vessel.Class hiding (empty)
 import Data.Vessel.DependentMap
@@ -117,7 +118,7 @@ instance (Has' Semigroup k (FlipAp g), GCompare k, Has View k) => Monoid (Vessel
 instance (Has' Semigroup k (FlipAp g), Has' Group k (FlipAp g), GCompare k, Has View k) => Group (Vessel k g) where
   negateG (Vessel m) = Vessel (negateG m) --TODO: Do we know that nullV can't be the result of negateG?
 
-instance (Has' Additive k (FlipAp g), Has' Semigroup k (FlipAp g), GCompare k, Has View k) => Additive (Vessel k g)
+instance (Has' Commutative k (FlipAp g), Has' Semigroup k (FlipAp g), GCompare k, Has View k) => Commutative (Vessel k g)
 
 ------- The View instance for Vessel itself --------
 

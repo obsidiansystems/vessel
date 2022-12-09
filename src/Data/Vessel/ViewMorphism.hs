@@ -24,17 +24,17 @@
 module Data.Vessel.ViewMorphism where
 ------- Selectable convenience class -------
 
-import Prelude hiding (id, (.))
-import Control.Monad
 import Control.Applicative
 import Control.Category
+import Control.Monad
+import Data.Align
 import Data.Bifunctor
 import Data.Functor.Identity
 import Data.These
-import Reflex.Query.Class
-import Reflex.Class
-import Data.Align
 import Data.Vessel.Internal ()
+import Prelude hiding ((.), id)
+import Reflex.Class
+import Reflex.Query.Class
 
 type family ViewQueryResult (v :: k) :: k
 
@@ -119,4 +119,3 @@ queryViewMorphism :: forall t (p :: *) (q :: *) m partial.
 queryViewMorphism x q = do
   v :: Dynamic t (QueryResult q) <- queryDyn $ (\(ViewMorphism (ViewHalfMorphism f _) _) -> runIdentity $ f x) <$> q
   return $ (\v' (ViewMorphism  (ViewHalfMorphism _ g) _) -> g v') <$> v <*> q
-

@@ -25,24 +25,25 @@ import Data.Aeson
 import Data.Bifunctor
 import Data.Constraint.Extras
 import Data.Constraint.Forall
+import qualified Data.Dependent.Map as DMap'
 import Data.Dependent.Map.Monoidal (MonoidalDMap(..))
 import qualified Data.Dependent.Map.Monoidal as MonoidalDMap
-import Data.Functor.Compose
-import Data.GADT.Compare
-import Data.Some (Some(Some))
-import GHC.Generics
-import Data.Functor.Identity
+import qualified Data.Dependent.Map.Monoidal as DMap
 import Data.Dependent.Sum
 import Data.Dependent.Sum.Orphans ()
+import Data.Functor.Compose
+import Data.Functor.Identity
+import Data.GADT.Compare
+import Data.Patch (Group(..))
+import Data.Semigroup.Commutative
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Patch (Group(..), Additive)
-import qualified Data.Dependent.Map as DMap'
-import qualified Data.Dependent.Map.Monoidal as DMap
+import Data.Some (Some(Some))
+import GHC.Generics
 
 import Data.Vessel.Class
-import Data.Vessel.Selectable
 import Data.Vessel.Internal
+import Data.Vessel.Selectable
 
 -- | A functor-indexed container corrresponding to DMap k v.
 newtype DMapV (k :: x -> *) (v :: x -> *) g = DMapV { unDMapV :: MonoidalDMap k (g :.: v) }
@@ -53,7 +54,7 @@ deriving instance (GCompare k, Has' Eq k (g :.: v), Has' Ord k (g :.: v)) => Ord
 deriving instance (GCompare k, Has' Semigroup k (g :.: v)) => Semigroup (DMapV k v g)
 deriving instance (GCompare k, Has' Semigroup k (g :.: v), Has' Monoid k (g :.: v)) => Monoid (DMapV k v g)
 deriving instance (GCompare k, Has' Semigroup k (g :.: v), Has' Monoid k (g :.: v), Has' Group k (g :.: v)) => Group (DMapV k v g)
-deriving instance (GCompare k, Has' Semigroup k (g :.: v), Has' Monoid k (g :.: v), Has' Group k (g :.: v), Has' Additive k (g :.: v)) => Additive (DMapV k v g)
+deriving instance (GCompare k, Has' Semigroup k (g :.: v), Has' Monoid k (g :.: v), Has' Group k (g :.: v), Has' Commutative k (g :.: v)) => Commutative (DMapV k v g)
 
 instance (Has' ToJSON k (g :.: v), ForallF ToJSON k) => ToJSON (DMapV k v g)
 
