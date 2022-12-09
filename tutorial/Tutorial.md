@@ -15,7 +15,6 @@ import Control.Lens
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Fix
-import Data.Aeson (FromJSON(..), ToJSON(..))
 import Data.Aeson.GADT.TH (deriveJSONGADT)
 import Data.Align
 import Data.Proxy
@@ -28,6 +27,7 @@ import Reflex
 import Reflex.Network
 import qualified Data.Map as Map
 import qualified Data.Map.Merge.Strict as Map
+import Data.Semigroup.Commutative
 
 import Data.Vessel
 import Data.Vessel.ViewMorphism
@@ -77,7 +77,7 @@ have.  The latter is almost always quicker.
 instance (Eq g, Monoid g) => Semigroup (Qsimple g) where Qsimple x y <> Qsimple x' y' = Qsimple (x <> x') (y <> y')
 instance (Eq g, Monoid g) => Monoid (Qsimple g) where mempty = Qsimple mempty mempty
 instance (Eq g, Group g) => Group (Qsimple g) where negateG (Qsimple x y) = Qsimple (negateG x) (negateG y)
-instance (Eq g, Monoid g, Additive g) => Additive (Qsimple g)
+instance (Eq g, Monoid g, Commutative g) => Commutative (Qsimple g)
 instance GrpFunctor Qsimple where mapG f (Qsimple x y) = Qsimple (mapG f x) (mapG f y)
 
 ```
@@ -275,7 +275,7 @@ positive x
 
 
 dischargeMonadQuery :: forall v t m a.
-  ( Additive (v SelectedCount), Group (v SelectedCount), PerformEvent t m, GrpFunctor v, Eq (v SelectedCount)
+  ( Commutative (v SelectedCount), Group (v SelectedCount), PerformEvent t m, GrpFunctor v, Eq (v SelectedCount)
   , Monoid (QueryResult (v SelectedCount)), PostBuild t m, MonadHold t m, MonadFix m, Widget t m
   , Query (v SelectedCount)
   )

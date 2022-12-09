@@ -101,6 +101,7 @@ library vessel-tutorial
       aeson
     , aeson-gadt-th
     , base
+    , commutative-semigroups
     , constraints
     , constraints-extras
     , containers
