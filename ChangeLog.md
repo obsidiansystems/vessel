@@ -1,5 +1,9 @@
 # Revision history for vessel
 
+## 0.3.0.0
+
+* Fix singleV: absent query /= present query for deleted item
+
 ## 0.2.1.0
 
 * Allow `Vessel` and `DMapV` types to be more liberally kinded in their indexes.
