@@ -24,21 +24,21 @@ module Data.Vessel.Class where
 import Control.Arrow ((***))
 import Control.Monad.Writer.Strict (Writer, execWriter, tell)
 import Data.Align
+import qualified Data.Dependent.Map as DMap'
+import Data.Dependent.Map.Monoidal (MonoidalDMap(..))
+import qualified Data.Dependent.Map.Monoidal as DMap
 import Data.Foldable
 import Data.Functor.Compose
-import Data.Witherable
-import GHC.Generics
+import Data.Functor.Identity
+import Data.GADT.Compare
+import Data.Map.Monoidal (MonoidalMap(..))
+import Data.Maybe (fromMaybe)
+import Data.Proxy
 import Data.Semigroup
 import Data.These
-import Data.Maybe (fromMaybe)
-import Data.Functor.Identity
+import GHC.Generics
 import Reflex.Query.Class
-import Data.Proxy
-import Data.Map.Monoidal (MonoidalMap (..))
-import Data.Dependent.Map.Monoidal (MonoidalDMap (..))
-import Data.GADT.Compare
-import qualified Data.Dependent.Map.Monoidal as DMap
-import qualified Data.Dependent.Map as DMap'
+import Witherable
 
 import Data.Vessel.Internal
 
@@ -370,4 +370,3 @@ filterV f = mapMaybeV (\x -> if f x then Just x else Nothing)
 
 -- | a completely empty view.
 instance View Proxy
-

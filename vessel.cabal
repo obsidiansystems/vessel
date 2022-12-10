@@ -46,12 +46,13 @@ library
     UndecidableInstances
 
   build-depends:
-      aeson                        >=1.4     && <1.6
-    , base                         >=4.9     && <4.15
+      aeson                        >=1.4     && <2.2
+    , base                         >=4.9     && <4.17
     , base-orphans                 ^>=0.8.5
     , bifunctors                   ^>=5.5
+    , commutative-semigroups       ^>=0.1
     , constraints                  >=0.10    && <0.15
-    , constraints-extras           ^>=0.3
+    , constraints-extras           ^>=0.4
     , containers                   ^>=0.6
     , dependent-map                ^>=0.4
     , dependent-monoidal-map       ^>=0.1.1.0
@@ -59,7 +60,7 @@ library
     , dependent-sum-aeson-orphans  ^>=0.3.1
     , monoidal-containers          ^>=0.6
     , mtl                          ^>=2.2
-    , patch                        ^>=0.0.4.0
+    , patch                        ^>=0.0.7.0
     , reflex                       >=0.6.4   && <0.9
     , semialign                    >=1
     , these                        >=1 && <1.2
@@ -100,6 +101,7 @@ library vessel-tutorial
       aeson
     , aeson-gadt-th
     , base
+    , commutative-semigroups
     , constraints
     , constraints-extras
     , containers

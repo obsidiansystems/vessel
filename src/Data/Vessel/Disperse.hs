@@ -20,12 +20,12 @@
 module Data.Vessel.Disperse where
 
 import Control.Arrow ((***))
-import Data.Witherable
 import Data.Align
-import Data.Map.Monoidal (MonoidalMap (..))
+import Data.Foldable hiding (null)
+import Data.Map.Monoidal (MonoidalMap(..))
 import qualified Data.Map.Monoidal as Map
 import Data.These
-import Data.Foldable hiding (null)
+import Witherable
 
 import Data.Vessel.Internal
 
@@ -73,4 +73,3 @@ instance Ord k => Disperse (MonoidalMap k) where
     None -> nil
     One k v -> fmap (Map.singleton k) v
     Split pivot _l _r -> uncurry (alignWith (mergeThese unionDistinctAsc)) $ condense *** condense $ splitLT pivot row
-

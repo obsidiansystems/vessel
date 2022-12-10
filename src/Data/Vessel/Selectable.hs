@@ -31,4 +31,3 @@ class Selectable v k where
   selector :: (forall a. p a) -> k -> v p
   -- | From a view, extract a more convenient type of value to use.
   selection :: k -> v Identity -> Selection v k
-

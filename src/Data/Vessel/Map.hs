@@ -23,19 +23,20 @@ import Control.Applicative
 import Data.Aeson
 import Data.Align
 import Data.Foldable
-import Data.Functor.Identity
 import Data.Functor.Compose
-import Data.Map.Monoidal (MonoidalMap (..))
-import Data.Patch (Group(..), Additive)
-import GHC.Generics
-import qualified Data.Map.Monoidal as Map
+import Data.Functor.Identity
 import qualified Data.Map as Map'
 import qualified Data.Map.Merge.Strict as Map'
+import Data.Map.Monoidal (MonoidalMap(..))
+import qualified Data.Map.Monoidal as Map
+import Data.Patch (Group(..))
+import Data.Semigroup.Commutative
 import Data.Set (Set)
+import GHC.Generics
 
 import Data.Vessel.Class hiding (empty)
-import Data.Vessel.Selectable
 import Data.Vessel.Disperse
+import Data.Vessel.Selectable
 import Data.Vessel.ViewMorphism
 
 -- | A functor-indexed container corresponding to Map k v.
@@ -60,7 +61,7 @@ instance (Ord k, Eq g, Monoid g) => Monoid (MapV k v (Const g)) where
 
 instance (Ord k, Eq g, Group g) => Group (MapV k v (Const g)) where
   negateG (MapV (MonoidalMap xs)) = MapV $ MonoidalMap $ fmap negateG xs
-instance (Ord k, Eq g, Group g, Additive g) => Additive (MapV k v (Const g))
+instance (Ord k, Eq g, Group g, Commutative g) => Commutative (MapV k v (Const g))
 
 instance (Ord k1, Ord k2, Monoid g, Eq g) => Semigroup (MapV k1 v (Compose (MonoidalMap k2) (Const g))) where
   MapV (MonoidalMap xs) <> MapV (MonoidalMap ys) = MapV $ MonoidalMap $ Map'.merge Map'.preserveMissing Map'.preserveMissing (Map'.zipWithMaybeMatched $ \_ (Compose (MonoidalMap x)) (Compose (MonoidalMap y)) -> fmap Compose $ nothingOnNull $ MonoidalMap $ mergeMapSemigroup x y) xs ys
@@ -82,7 +83,7 @@ instance (Ord k1, Ord k2, Monoid g, Eq g) => Monoid (MapV k1 v (Compose (Monoida
 
 instance (Ord k1, Ord k2, Group g, Eq g) => Group (MapV k1 v (Compose (MonoidalMap k2) (Const g))) where
   negateG (MapV xs) = MapV $ fmap negateG xs
-instance (Ord k1, Ord k2, Additive g, Group g, Eq g) => Additive (MapV k1 v (Compose (MonoidalMap k2) (Const g)))
+instance (Ord k1, Ord k2, Commutative g, Group g, Eq g) => Commutative (MapV k1 v (Compose (MonoidalMap k2) (Const g)))
 
 instance (Ord k) => View (MapV k v) where
   cropV f (MapV s) (MapV i) = collapseNullV $ MapV (Map.intersectionWithKey (\_ x y -> f x y) s i)

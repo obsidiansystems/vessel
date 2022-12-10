@@ -20,16 +20,17 @@
 
 module Data.Vessel.Single where
 
-import Data.These
-import Data.Patch (Group(..), Additive)
-import Data.Semigroup
-import Data.Functor.Identity
-import Data.Witherable
+import Data.Aeson
+import Data.Align
 import Data.Functor.Compose
 import Data.Functor.Const
-import Data.Align
-import Data.Aeson
+import Data.Functor.Identity
+import Data.Patch (Group(..))
+import Data.Semigroup
+import Data.Semigroup.Commutative
+import Data.These
 import GHC.Generics (Generic)
+import Witherable
 
 import Data.Vessel.Class
 import Data.Vessel.Selectable
@@ -56,7 +57,7 @@ instance (Monoid (g (First (Maybe a)))) => Monoid (SingleV a g) where
 instance (Group (g (First (Maybe a)))) => Group (SingleV a g) where
   negateG (SingleV x) = SingleV (negateG x)
 
-instance (Additive (g (First (Maybe a)))) => Additive (SingleV a g)
+instance (Commutative (g (First (Maybe a)))) => Commutative (SingleV a g)
 
 instance View (SingleV a) where
   cropV f (SingleV s) (SingleV i) = Just $ SingleV $ f s i

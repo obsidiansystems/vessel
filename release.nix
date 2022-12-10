@@ -24,7 +24,7 @@ let
       } {};
     })
   ];
-  rp = import ./reflex-platform { inherit haskellOverlaysPost; };
+  rp = import ./reflex-platform { inherit haskellOverlaysPost; __useNewerCompiler = true; };
 in
 { ghc = rp.ghc.callCabal2nix "vessel" ./. {};
   ghcjs = rp.ghcjs.callCabal2nix "vessel" ./. {};

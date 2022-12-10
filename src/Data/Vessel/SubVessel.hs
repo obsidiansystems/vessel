@@ -24,7 +24,9 @@ import Control.Applicative
 import Data.Aeson
 import Data.Constraint
 import Data.Constraint.Extras
+import qualified Data.Dependent.Map as DMap'
 import Data.Dependent.Map.Monoidal (MonoidalDMap(..))
+import qualified Data.Dependent.Map.Monoidal as DMap
 import Data.Dependent.Sum (DSum(..))
 import Data.Foldable
 import Data.Functor.Compose
@@ -32,20 +34,20 @@ import Data.Functor.Identity
 import Data.GADT.Compare
 import Data.GADT.Show
 import Data.Map.Monoidal (MonoidalMap(..))
+import qualified Data.Map.Monoidal as Map
+import Data.Orphans ()
+import Data.Patch (Group(..))
 import Data.Proxy
+import Data.Semigroup.Commutative
 import Data.Set (Set)
 import Data.Some (Some(Some))
 import Data.Type.Equality
 import GHC.Generics
-import Data.Patch (Group(..), Additive)
 import Reflex.Query.Class
-import qualified Data.Dependent.Map as DMap'
-import qualified Data.Dependent.Map.Monoidal as DMap
-import qualified Data.Map.Monoidal as Map
 
 import Data.Vessel.Class hiding (empty)
-import Data.Vessel.Vessel
 import Data.Vessel.Internal
+import Data.Vessel.Vessel
 import Data.Vessel.ViewMorphism
 
 data SubVesselKey k (f :: (* -> *) -> *) (g :: (* -> *) -> *) where
@@ -56,8 +58,7 @@ instance Show k => GShow (SubVesselKey k f) where gshowsPrec = showsPrec
 instance FromJSON k => FromJSON (Some (SubVesselKey k v)) where parseJSON v = Some . SubVesselKey <$> parseJSON v
 instance ToJSON k => ToJSON (SubVesselKey k f g) where toJSON (SubVesselKey k) = toJSON k
 
-instance ArgDict c (SubVesselKey k f) where
-  type ConstraintsFor (SubVesselKey k f) c = c f
+instance (c f) => Has c (SubVesselKey k f) where
   argDict (SubVesselKey _) = Dict
 
 instance Eq k => GEq (SubVesselKey k v) where
@@ -76,7 +77,7 @@ instance Ord k => GCompare (SubVesselKey k v) where
 -- TODO: this representation has the advantage that all of it's instances come "free", but the mostly "right" representation is probably
 -- ... Vessel v (Compose (MonoidalMap k) f)
 newtype SubVessel (k :: *)  (v :: (* -> *) -> *) (f :: * -> *) = SubVessel { unSubVessel :: Vessel (SubVesselKey k v) f }
-  deriving (FromJSON, ToJSON, Semigroup, Monoid, Generic, Group, Additive, Eq)
+  deriving (FromJSON, ToJSON, Semigroup, Monoid, Generic, Group, Commutative, Eq)
 
 deriving instance (Show k, Show (v f)) => Show (SubVessel k v f)
 
@@ -244,4 +245,3 @@ handleSubSubVesselSelector f xs = currySubVessel <$> handleSubVesselSelector f (
 
 instance (Ord k, View v) => EmptyView (SubVessel k v) where
   emptyV = SubVessel emptyV
-

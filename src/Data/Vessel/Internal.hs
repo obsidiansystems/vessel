@@ -25,25 +25,26 @@ module Data.Vessel.Internal where
 
 import Control.Arrow ((***))
 import Data.Aeson
+import Data.Coerce
 import Data.Constraint.Extras
 import Data.Constraint.Forall
-import Data.Dependent.Map.Internal (DMap (..))
 import qualified Data.Dependent.Map as DMap'
+import Data.Dependent.Map.Internal (DMap(..))
 import Data.Dependent.Map.Monoidal (MonoidalDMap(..))
 import Data.Functor.Compose
 import Data.Functor.Const
 import Data.GADT.Compare
-import Data.Some (Some(Some))
-import Data.Map.Monoidal (MonoidalMap (..))
-import qualified Data.Map.Monoidal as Map
-import Data.These
-import Data.Patch (Group(..), Additive)
-import Data.Coerce
-import Data.Set (Set)
-import Data.Witherable
 import qualified Data.Map as Map'
 import qualified Data.Map.Merge.Strict as Map'
+import Data.Map.Monoidal (MonoidalMap(..))
+import qualified Data.Map.Monoidal as Map
+import Data.Patch (Group(..))
+import Data.Semigroup.Commutative
+import Data.Set (Set)
+import Data.Some (Some(Some))
+import Data.These
 import GHC.Generics
+import Witherable
 
 import qualified Data.Dependent.Map.Monoidal as DMap
 -- import qualified Data.Dependent.Map as DMap'
@@ -63,7 +64,7 @@ instance Monoid (v g) => Monoid (FlipAp g v) where
 instance Group (v g) => Group (FlipAp g v) where
   negateG (FlipAp x) = FlipAp (negateG x)
 
-instance Additive (v g) => Additive (FlipAp g v)
+instance Commutative (v g) => Commutative (FlipAp g v)
 
 
 -- A single Vessel key/value pair, essentially a choice of container type, together with a corresponding container.
@@ -88,9 +89,9 @@ instance forall k g. (FromJSON (Some k), HasV FromJSON k g) => FromJSON (VSum k 
 instance (Has' Group f g, Has' Semigroup f g, GCompare f) => Group (MonoidalDMap f g) where
   negateG (MonoidalDMap m) = MonoidalDMap (DMap'.mapWithKey (\k v -> has' @Group @g k (negateG v)) m)
 
-instance (Has' Group f g, Has' Semigroup f g, GCompare f) => Additive (MonoidalDMap f g)
+instance (Has' Group f g, Has' Semigroup f g, GCompare f) => Commutative (MonoidalDMap f g)
 
-instance (Additive (f (g a))) => Additive (Compose f g a)
+instance (Commutative (f (g a))) => Commutative (Compose f g a)
 
 ------- Miscellaneous stuff to be moved elsewhere -------
 
