@@ -9,11 +9,11 @@ author:             Obsidian Systems LLC
 maintainer:         maintainer@obsidian.systems
 copyright:          Obsidian Systems LLC
 build-type:         Simple
-extra-doc-files:    tutorial/Tutorial.md
+-- extra-doc-files:    tutorial/Tutorial.md
 extra-source-files:
   ChangeLog.md
   README.md
-  tutorial/Tutorial.md
+--  tutorial/Tutorial.md
 
 cabal-version:      2.0
 category:           Data
@@ -70,57 +70,57 @@ library
   hs-source-dirs:   src
   default-language: Haskell2010
 
-library vessel-tutorial
-  if impl(ghcjs)
-    buildable: False
-
-  hs-source-dirs:     tutorial
-  exposed-modules:    Tutorial
-  default-language:   Haskell2010
-  default-extensions:
-    ConstraintKinds
-    FlexibleContexts
-    FlexibleInstances
-    GADTs
-    GeneralizedNewtypeDeriving
-    LambdaCase
-    MultiParamTypeClasses
-    OverloadedStrings
-    QuantifiedConstraints
-    RankNTypes
-    RecursiveDo
-    RoleAnnotations
-    ScopedTypeVariables
-    StandaloneDeriving
-    TemplateHaskell
-    TypeFamilies
-    UndecidableInstances
-
-  ghc-options:        -Wall -pgmL markdown-unlit
-  build-tool-depends: markdown-unlit:markdown-unlit -any
-  build-depends:
-      aeson
-    , aeson-gadt-th
-    , base
-    , commutative-semigroups
-    , constraints
-    , constraints-extras
-    , containers
-    , dependent-map
-    , dependent-monoidal-map
-    , dependent-sum
-    , dependent-sum-aeson-orphans
-    , dependent-sum-template
-    , lens
-    , markdown-unlit
-    , monoidal-containers
-    , mtl
-    , reflex
-    , semialign
-    , text
-    , these
-    , vessel
-    , witherable
+-- library vessel-tutorial
+--   if impl(ghcjs)
+--     buildable: False
+-- 
+--   hs-source-dirs:     tutorial
+--   exposed-modules:    Tutorial
+--   default-language:   Haskell2010
+--   default-extensions:
+--     ConstraintKinds
+--     FlexibleContexts
+--     FlexibleInstances
+--     GADTs
+--     GeneralizedNewtypeDeriving
+--     LambdaCase
+--     MultiParamTypeClasses
+--     OverloadedStrings
+--     QuantifiedConstraints
+--     RankNTypes
+--     RecursiveDo
+--     RoleAnnotations
+--     ScopedTypeVariables
+--     StandaloneDeriving
+--     TemplateHaskell
+--     TypeFamilies
+--     UndecidableInstances
+-- 
+--   ghc-options:        -Wall -pgmL markdown-unlit
+--   build-tool-depends: markdown-unlit:markdown-unlit -any
+--   build-depends:
+--       aeson
+--     , aeson-gadt-th
+--     , base
+--     , commutative-semigroups
+--     , constraints
+--     , constraints-extras
+--     , containers
+--     , dependent-map
+--     , dependent-monoidal-map
+--     , dependent-sum
+--     , dependent-sum-aeson-orphans
+--     , dependent-sum-template
+--     , lens
+--     , markdown-unlit
+--     , monoidal-containers
+--     , mtl
+--     , reflex
+--     , semialign
+--     , text
+--     , these
+--     , vessel
+--     , witherable
 
 source-repository head
   type:     git
