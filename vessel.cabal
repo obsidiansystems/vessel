@@ -61,7 +61,7 @@ library
     , monoidal-containers          ^>=0.6
     , mtl                          ^>=2.2
     , patch                        ^>=0.0.7.0
-    , reflex                       >=0.6.4   && <0.9
+    , reflex                       >=0.6.4   && <1
     , semialign                    >=1
     , these                        >=1 && <1.2
     , witherable                   >=0.2 && <0.5
