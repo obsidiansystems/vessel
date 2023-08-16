@@ -1,5 +1,9 @@
 # Revision history for vessel
 
+## Unreleased
+
+* Add flag for enabling/disabling tutorial build
+
 ## 0.3.0.0-r1
 
 * Loosen reflex bounds
