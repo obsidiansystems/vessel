@@ -181,6 +181,21 @@ traverseWithKeyV f (Vessel x) = Vessel . filterNullFlipAps <$> DMap.traverseWith
 traverseWithKeyV_ :: (GCompare k, Has View k, Applicative m) => (forall v. View v => k v -> v g -> m ()) -> Vessel k g -> m ()
 traverseWithKeyV_ f (Vessel x) = void $ DMap.traverseWithKey (\k (FlipAp v) -> has @View k $ Const () <$ f k v) x
 
+mapVesselKeysWith :: GCompare k' => (forall v. k' v -> v g -> v g -> v g) -> (forall v. k v -> k' v) -> Vessel k g -> Vessel k' g
+mapVesselKeysWith combineValues changeKey (Vessel m) = Vessel $ DMap.mapKeysWith (\k (FlipAp a) (FlipAp b) -> FlipAp $ combineValues k a b) changeKey m
+
+mapVesselKeysMonotonic
+  :: (forall v. k v -> k' v) -- ^ Warning: this function MUST be monotonic
+  -> Vessel k g
+  -> Vessel k' g
+mapVesselKeysMonotonic changeKey (Vessel m) = Vessel $ DMap.mapKeysMonotonic changeKey m
+
+mapVesselKeysMonotonicMaybe
+  :: (forall v. k v -> Maybe (k' v)) -- ^ Warning: this function MUST be monotonic for all Just results
+  -> Vessel k g
+  -> Vessel k' g
+mapVesselKeysMonotonicMaybe changeKey (Vessel m) = Vessel $ MonoidalDMap $ DMap'.fromDistinctAscList $ mapMaybe (\(k :=> v) -> (:=>) <$> changeKey k <*> pure v) $ DMap'.toAscList $ unMonoidalDMap m
+
 buildV :: (GCompare k, Has View k, Applicative m) => Vessel k g -> (forall v. k v -> v g -> m (v h)) -> m (Vessel k h)
 buildV v f = traverseWithKeyV f v
 
