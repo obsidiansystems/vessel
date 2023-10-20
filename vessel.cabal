@@ -38,6 +38,7 @@ library
     Data.Vessel.SubVessel
     Data.Vessel.Vessel
     Data.Vessel.ViewMorphism
+    Data.Vessel.Void
 
   other-extensions:
     FlexibleInstances
