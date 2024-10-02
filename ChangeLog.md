@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Support GHCs through 9.8
+
 * Add flag for enabling/disabling tutorial build
 
 ## 0.3.0.0-r1
