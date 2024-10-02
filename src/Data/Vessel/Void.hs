@@ -13,7 +13,7 @@ import Data.Patch (Group(..))
 import Data.Vessel.Class
 import Reflex.Query.Class
 
--- | completly empty View.
+-- | Completely empty View.
 data VoidV (v :: * -> *) = VoidV
   deriving (Eq, Ord, Show, Generic)
 

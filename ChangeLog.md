@@ -1,5 +1,13 @@
 # Revision history for vessel
 
+## Unreleased
+
+* Add flag for enabling/disabling tutorial build
+
+## 0.3.0.0-r1
+
+* Loosen reflex bounds
+
 ## 0.3.0.0
 
 * Fix singleV: absent query /= present query for deleted item
