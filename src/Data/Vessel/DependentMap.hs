@@ -34,6 +34,7 @@ import Data.Dependent.Sum.Orphans ()
 import Data.Functor.Compose
 import Data.Functor.Identity
 import Data.GADT.Compare
+import Data.Kind (Type)
 import Data.Patch (Group(..))
 import Data.Semigroup.Commutative
 import Data.Set (Set)
@@ -46,7 +47,7 @@ import Data.Vessel.Internal
 import Data.Vessel.Selectable
 
 -- | A functor-indexed container corrresponding to DMap k v.
-newtype DMapV (k :: x -> *) (v :: x -> *) g = DMapV { unDMapV :: MonoidalDMap k (g :.: v) }
+newtype DMapV (k :: x -> Type) (v :: x -> Type) g = DMapV { unDMapV :: MonoidalDMap k (g :.: v) }
   deriving (Generic)
 
 deriving instance (GCompare k, Has' Eq k (g :.: v)) => Eq (DMapV k v g)

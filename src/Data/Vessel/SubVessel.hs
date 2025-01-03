@@ -33,6 +33,7 @@ import Data.Functor.Compose
 import Data.Functor.Identity
 import Data.GADT.Compare
 import Data.GADT.Show
+import Data.Kind (Type)
 import qualified Data.Map as Map'
 import Data.Map.Monoidal (MonoidalMap(..))
 import qualified Data.Map.Monoidal as Map
@@ -51,7 +52,7 @@ import Data.Vessel.Internal
 import Data.Vessel.Vessel
 import Data.Vessel.ViewMorphism
 
-data SubVesselKey k (f :: (* -> *) -> *) (g :: (* -> *) -> *) where
+data SubVesselKey k (f :: (Type -> Type) -> Type) (g :: (Type -> Type) -> Type) where
   SubVesselKey :: k -> SubVesselKey k f f
 deriving instance Show k => Show (SubVesselKey k f g)
 instance Show k => GShow (SubVesselKey k f) where gshowsPrec = showsPrec
@@ -77,7 +78,7 @@ instance Ord k => GCompare (SubVesselKey k v) where
 --
 -- TODO: this representation has the advantage that all of it's instances come "free", but the mostly "right" representation is probably
 -- ... Vessel v (Compose (MonoidalMap k) f)
-newtype SubVessel (k :: *)  (v :: (* -> *) -> *) (f :: * -> *) = SubVessel { unSubVessel :: Vessel (SubVesselKey k v) f }
+newtype SubVessel (k :: Type)  (v :: (Type -> Type) -> Type) (f :: Type -> Type) = SubVessel { unSubVessel :: Vessel (SubVesselKey k v) f }
   deriving (FromJSON, ToJSON, Semigroup, Monoid, Generic, Group, Commutative, Eq)
 
 deriving instance (Show k, Show (v f)) => Show (SubVessel k v f)
@@ -106,7 +107,7 @@ instance
     , Query (Vessel (SubVesselKey k v) g)
     , Semigroup (v (Compose c (VesselLeafWrapper (QueryResult (Vessel (SubVesselKey k v) g)))))
     )
-    => Query (SubVessel k v (Compose c (g :: * -> *))) where
+    => Query (SubVessel k v (Compose c (g :: Type -> Type))) where
   type QueryResult (SubVessel k v (Compose c g)) = SubVessel k v
     (Compose c (VesselLeafWrapper (QueryResult (Vessel (SubVesselKey k v) g))))
   crop (SubVessel q) (SubVessel r) = SubVessel (crop q r)
@@ -203,14 +204,14 @@ fromSubVessels k = ViewHalfMorphism
   }
 
 
-mapMaybeWithKeySubVessel :: forall k v (g :: * -> *) (g' :: * -> *) . (View v, Ord k) => (k -> v g -> Maybe (v g')) -> SubVessel k v g -> SubVessel k v g'
+mapMaybeWithKeySubVessel :: forall k v (g :: Type -> Type) (g' :: Type -> Type) . (View v, Ord k) => (k -> v g -> Maybe (v g')) -> SubVessel k v g -> SubVessel k v g'
 mapMaybeWithKeySubVessel f (SubVessel xs) = SubVessel (mapMaybeWithKeyV @(SubVesselKey k v) f' xs)
   where
     f' :: forall x . SubVesselKey k v x -> x g -> Maybe (x g')
     f' (SubVesselKey k) = f k
 
 mapMaybeWithKeySubVesselSlow
-  :: forall k (v :: (* -> *) -> *) v' (g :: * -> *) (g' :: * -> *).
+  :: forall k (v :: (Type -> Type) -> Type) v' (g :: Type -> Type) (g' :: Type -> Type).
     Ord k
   => (k -> v g -> Maybe (v' g'))
   -> SubVessel k v g
@@ -241,7 +242,7 @@ condenseVMMap = mapV (Compose . MonoidalMap . getCompose) . condenseV . getMonoi
 
 -- | A gadget to "traverse" over all of the keys in a SubVessel in one step
 handleSubVesselSelector
-  ::  forall k m tag (f :: * -> *) (g :: * -> *).
+  ::  forall k m tag (f :: Type -> Type) (g :: Type -> Type).
   ( Ord k, Applicative m, Has View tag, GCompare tag )
   => (forall v.  tag v
              ->    MonoidalMap k (v f)

@@ -23,6 +23,7 @@ import Data.Aeson
 import Data.Functor.Compose
 import Data.Functor.Const
 import Data.Functor.Identity
+import Data.Kind (Type)
 import Data.Patch (Group(..))
 import Data.Semigroup.Commutative
 import Data.These
@@ -33,7 +34,7 @@ import Data.Vessel.Selectable
 import Data.Vessel.ViewMorphism
 
 -- | A functor-indexed container corresponding to Identity. (i.e. a single non-deletable item)
-newtype IdentityV (a :: *) (g :: * -> *) = IdentityV { unIdentityV :: g a }
+newtype IdentityV (a :: Type) (g :: Type -> Type) = IdentityV { unIdentityV :: g a }
   deriving (Eq, Ord, Show, Read, Semigroup, Monoid, Group, Commutative, Generic, ToJSON, FromJSON)
 
 instance View (IdentityV a) where

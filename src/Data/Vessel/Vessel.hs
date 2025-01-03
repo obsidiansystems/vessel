@@ -38,6 +38,7 @@ import Data.Functor.Compose
 import Data.Functor.Identity
 import Data.GADT.Compare
 import Data.GADT.Show
+import Data.Kind (Type)
 import Data.Maybe (fromMaybe)
 import Data.Monoid.DecidablyEmpty
 import Data.Patch (Group(..))
@@ -59,18 +60,18 @@ import Data.Vessel.ViewMorphism
 -- | This type is a container for storing an arbitrary collection of functor-parametric container types of the sort
 -- discussed above, keyed by a GADT whose index will specify which sort of container goes in each position.
 --
--- Ordinary types with values have kind *
--- Functors have kind k -> *
--- Containers taking a functor as a parameter then have kind (k -> *) -> *
--- The keys of a vessel are indexed by a functor-parametric container type, so they have kind ((k -> *) -> *) -> *
+-- Ordinary types with values have kind Type
+-- Functors have kind k -> Type
+-- Containers taking a functor as a parameter then have kind (k -> Type) -> Type
+-- The keys of a vessel are indexed by a functor-parametric container type, so they have kind ((k -> Type) -> Type) -> Type
 -- Vessel itself, for any such key type, produces a functor-parametric container, so it has kind
--- (((k -> *) -> *) -> *) -> (k -> *) -> *
+-- (((k -> Type) -> Type) -> Type) -> (k -> Type) -> Type
 --
--- The majority of use cases will be working entirely within * so that Vessel will be instantiated to the kind
--- (((* -> *) -> *) -> *) -> (* -> *) -> *
+-- The majority of use cases will be working entirely within Type so that Vessel will be instantiated to the kind
+-- (((Type -> Type) -> Type) -> Type) -> (Type -> Type) -> Type
 --
 -- Law: None of the items in the Vessel's MonoidalDMap are nullV
-newtype Vessel (k :: ((x -> *) -> *) -> *) (g :: x -> *) = Vessel { unVessel :: MonoidalDMap k (FlipAp g) }
+newtype Vessel (k :: ((x -> Type) -> Type) -> Type) (g :: x -> Type) = Vessel { unVessel :: MonoidalDMap k (FlipAp g) }
   deriving (Generic)
 
 deriving instance (GCompare k, Has' Eq k (FlipAp g)) => Eq (Vessel k g)
@@ -114,7 +115,6 @@ instance (Has' Semigroup k (FlipAp g), GCompare k, Has View k) => Semigroup (Ves
 
 instance (Has' Semigroup k (FlipAp g), GCompare k, Has View k) => Monoid (Vessel k g) where
   mempty = Vessel DMap.empty
-  mappend = (<>)
 
 instance (Has' Semigroup k (FlipAp g), GCompare k, Has View k) => DecidablyEmpty (Vessel k g) where
   isEmpty = nullV

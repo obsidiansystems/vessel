@@ -56,7 +56,6 @@ instance (Ord k, Eq g, Monoid g) => Semigroup (MapV k v (Const g)) where
           xy = x <> y
 
 instance (Ord k, Eq g, Monoid g) => Monoid (MapV k v (Const g)) where
-  mappend = (<>)
   mempty = MapV Map.empty
 
 instance (Ord k, Eq g, Group g) => Group (MapV k v (Const g)) where
@@ -78,7 +77,6 @@ instance (Ord k1, Ord k2, Monoid g, Eq g) => Semigroup (MapV k1 v (Compose (Mono
                 xy = x <> y
 
 instance (Ord k1, Ord k2, Monoid g, Eq g) => Monoid (MapV k1 v (Compose (MonoidalMap k2) (Const g))) where
-  mappend = (<>)
   mempty = MapV Map.empty
 
 instance (Ord k1, Ord k2, Group g, Eq g) => Group (MapV k1 v (Compose (MonoidalMap k2) (Const g))) where

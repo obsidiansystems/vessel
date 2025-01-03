@@ -18,6 +18,7 @@ import Control.Monad.Fix
 import Data.Aeson.GADT.TH (deriveJSONGADT)
 import Data.Align
 import Data.Proxy
+import Data.Kind (Type)
 import Data.Map (Map)
 import Data.Map.Monoidal (MonoidalMap(..))
 import Data.Semigroup (First(..), Max(..))
@@ -91,7 +92,6 @@ instance (Monoid g, Eq g, Ord k) => Semigroup (GrpMap k g) where
 
 instance (Monoid g, Eq g, Ord k) => Monoid (GrpMap k g) where
   mempty = GrpMap Map.empty
-  mappend = (<>)
 
 instance (Group g, Eq g, Ord k) => Group (GrpMap k g) where
   negateG (GrpMap xs) = GrpMap $ fmap negateG xs
@@ -244,7 +244,7 @@ instances, even ones that can normally be derived.
 
 ```haskell
 
-data Qhkd (f :: * -> *) = Qhkd
+data Qhkd (f :: Type -> Type) = Qhkd
   { _qhkd_posts :: MonoidalMap PostId (f (First (Maybe Post))) -- ^ posts
   , _qhkd_latestPostId :: MonoidalMap () (f (Max (Maybe PostId))) -- ^ the max post id;
   }
@@ -260,7 +260,7 @@ expressing the same concept is with a DMap.  with this approach:
 
 ```haskell
 
-data Qtag (a :: *) where
+data Qtag (a :: Type) where
   Qtag_Posts        :: PostId -> Qtag (First (Maybe Post))
   Qtag_LatestPostId :: Qtag (Max (Maybe PostId))
 
@@ -275,7 +275,7 @@ parameters, and most of the applied types are also functor parametric.
 
 ```haskell
 
-data Qvessel (v :: (* -> *) -> *) where
+data Qvessel (v :: (Type -> Type) -> Type) where
   Posts        :: Qvessel (MapV PostId (First (Maybe Post)))
   LatestPostId :: Qvessel (IdentityV (Max (Maybe PostId)))
 

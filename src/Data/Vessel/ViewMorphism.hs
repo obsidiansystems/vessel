@@ -30,6 +30,7 @@ import Control.Monad
 import Data.Align
 import Data.Bifunctor
 import Data.Functor.Identity
+import Data.Kind (Type)
 import Data.These
 import Data.Vessel.Internal ()
 import Prelude hiding ((.), id)
@@ -67,7 +68,6 @@ instance (Semigroup (m b) , Semigroup (n (ViewQueryResult a))) => Semigroup (Vie
   ViewHalfMorphism f f' <> ViewHalfMorphism g g' = ViewHalfMorphism (f <> g) (f' <> g')
 
 instance (Monoid (m b) , Monoid (n (ViewQueryResult a))) => Monoid (ViewHalfMorphism m n a b) where
-  mappend = (<>)
   mempty = ViewHalfMorphism mempty mempty
 
 instance
@@ -80,7 +80,6 @@ instance
     ( Monoid (m b), Monoid (m (ViewQueryResult b))
     , Monoid (n a), Monoid (n (ViewQueryResult a))
     )  => Monoid (ViewMorphism m n a b) where
-  mappend = (<>)
   mempty = ViewMorphism mempty mempty
 
 -- | query for two things simultaneously, return as much result as is available.
@@ -109,7 +108,7 @@ fromZipViewMorphism (ViewHalfMorphism c2a a2c') (ViewHalfMorphism c2b b2c') = Vi
     , _viewMorphism_mapQueryResult = these id id ((<>)) . bimap a2c' b2c'
     }
 
-queryViewMorphism :: forall t (p :: *) (q :: *) m partial.
+queryViewMorphism :: forall t (p :: Type) (q :: Type) m partial.
   ( Reflex t
   , MonadQuery t q m
   , Monad m

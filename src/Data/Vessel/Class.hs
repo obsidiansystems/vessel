@@ -31,6 +31,7 @@ import Data.Foldable
 import Data.Functor.Compose
 import Data.Functor.Identity
 import Data.GADT.Compare
+import Data.Kind (Type)
 import Data.Map.Monoidal (MonoidalMap(..))
 import Data.Maybe (fromMaybe)
 import Data.Proxy
@@ -60,7 +61,7 @@ import Data.Vessel.Internal
 --
 -- It also specifies the cropV operation which restricts a view to a particular selection, as well
 -- as operations for mapping functions over all the leaves of the container.
-class View (v :: (x -> *) -> *) where
+class View (v :: (x -> Type) -> Type) where
   -- | Transpose a sufficiently-Map-like structure into a container, effectively aggregating
   -- many structures into a single one containing information about which keys each part of it
   -- came from originally.

@@ -34,6 +34,7 @@ import Data.Dependent.Map.Monoidal (MonoidalDMap(..))
 import Data.Functor.Compose
 import Data.Functor.Const
 import Data.GADT.Compare
+import Data.Kind (Type)
 import qualified Data.Map as Map'
 import qualified Data.Map.Merge.Strict as Map'
 import Data.Map.Monoidal (MonoidalMap(..))
@@ -49,7 +50,7 @@ import Witherable
 import qualified Data.Dependent.Map.Monoidal as DMap
 -- import qualified Data.Dependent.Map as DMap'
 
-newtype FlipAp (g :: k) (v :: k -> *) = FlipAp { unFlipAp :: v g }
+newtype FlipAp (g :: k) (v :: k -> Type) = FlipAp { unFlipAp :: v g }
   deriving (Eq, Ord, Show)
 
 ------- Instances for FlipAp -------
@@ -59,7 +60,6 @@ instance Semigroup (v g) => Semigroup (FlipAp g v) where
 
 instance Monoid (v g) => Monoid (FlipAp g v) where
   mempty = FlipAp mempty
-  mappend (FlipAp x) (FlipAp y) = FlipAp (mappend x y)
 
 instance Group (v g) => Group (FlipAp g v) where
   negateG (FlipAp x) = FlipAp (negateG x)
@@ -68,7 +68,7 @@ instance Commutative (v g) => Commutative (FlipAp g v)
 
 
 -- A single Vessel key/value pair, essentially a choice of container type, together with a corresponding container.
-data VSum (k :: ((x -> *) -> *) -> *) (g :: x -> *) = forall v. k v :~> v g
+data VSum (k :: ((x -> Type) -> Type) -> Type) (g :: x -> Type) = forall v. k v :~> v g
 
 ------- Serialisation -------
 
@@ -159,7 +159,7 @@ splitLT k m = case Map.splitLookup k m of
   (l, Just v, r) -> (Map.insert k v l, r)
   (l, Nothing, r) -> (l, r)
 
-data PivotD (k :: l -> *) (g :: l -> *) = NoneD | forall v. OneD (k v) (g v) | forall v. SplitD (k v) (DMap k g) (DMap k g)
+data PivotD (k :: l -> Type) (g :: l -> Type) = NoneD | forall v. OneD (k v) (g v) | forall v. SplitD (k v) (DMap k g) (DMap k g)
 
 condenseD' :: (GCompare k, Foldable t, Filterable t)
            => DMap k g

@@ -18,7 +18,7 @@ extra-source-files:
 cabal-version:      2.0
 category:           Data
 synopsis:           Functor-parametric containers
-tested-with:        GHC ==8.6.5 || ==8.8.4 || ==8.10.7 || ==9.0.2 || ==9.2.5 || ==9.4.5 || ==9.6.1 || ==9.8.2
+tested-with:        GHC ==8.6.5 || ==8.8.4 || ==8.10.7 || ==9.0.2 || ==9.2.5 || ==9.4.5 || ==9.6.1 || ==9.8.2 || ==9.10.1
 
 flag build-tutorial
   default: True
@@ -51,13 +51,13 @@ library
 
   build-depends:
       aeson                        >=1.4     && <2.3
-    , base                         >=4.9     && <4.20
-    , base-orphans                 ^>=0.8.5
+    , base                         >=4.9     && <4.21
+    , base-orphans                 >=0.8.5   && <0.10
     , bifunctors                   >=5.5     && <5.7
-    , commutative-semigroups       ^>=0.1
+    , commutative-semigroups       >=0.1     && <0.3
     , constraints                  >=0.10    && <0.15
     , constraints-extras           ^>=0.4
-    , containers                   ^>=0.6
+    , containers                   >=0.6     && <0.8
     , dependent-map                ^>=0.4
     , dependent-monoidal-map       ^>=0.1.1.0
     , dependent-sum                ^>=0.7
@@ -97,6 +97,7 @@ library vessel-tutorial
     StandaloneDeriving
     TemplateHaskell
     TypeFamilies
+    TypeOperators
     UndecidableInstances
 
   ghc-options:        -Wall -pgmL markdown-unlit
